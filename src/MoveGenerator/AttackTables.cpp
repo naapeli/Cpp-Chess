@@ -1,5 +1,5 @@
-#include "../../include/MoveGenerator/AttackTables.h"
-#include "../../include/utils.h"
+#include "MoveGenerator/AttackTables.h"
+#include "utils.h"
 #include <algorithm>
 #include <iostream>
 
@@ -133,7 +133,7 @@ namespace piece_attacks
         return board;
     }
 
-    U64 pawn_attacks(int square, int side)
+    U64 _pawn_attacks(int square, int side)
     {
         U64 attack_table = 0ULL;
         U64 piece_location = 0ULL;
@@ -152,7 +152,12 @@ namespace piece_attacks
         return attack_table;
     }
 
-    U64 knight_attacks(int square)
+    U64 pawn_attacks(int square, int side)
+    {
+        return pawn_attacks_table[side][square];
+    }
+
+    U64 _knight_attacks(int square)
     {
         U64 attack_table = 0ULL;
         U64 piece_location = 0ULL;
@@ -168,6 +173,11 @@ namespace piece_attacks
         if (piece_location & not_ab_file & not_1_rank) attack_table |= (piece_location << 6);
 
         return attack_table;
+    }
+
+    U64 knight_attacks(int square)
+    {
+        return knight_attacks_table[square];
     }
 
     U64 bishop_attacks(int square, U64 blockers)
@@ -191,7 +201,7 @@ namespace piece_attacks
         return bishop_attacks(square, blockers) | rook_attacks(square, blockers);
     }
 
-    U64 king_attacks(int square)
+    U64 _king_attacks(int square)
     {
         U64 attack_table = 0ULL;
         U64 piece_location = 0ULL;
@@ -209,6 +219,11 @@ namespace piece_attacks
         return attack_table;
     }
 
+    U64 king_attacks(int square)
+    {
+        return king_attacks_table[square];
+    }
+
     U64 bishop_attack_mask_table[64];
     U64 rook_attack_mask_table[64];
 
@@ -222,10 +237,10 @@ namespace piece_attacks
     {
         for (int square = 0; square < 64; square++)
         {
-            pawn_attacks_table[white][square] = pawn_attacks(square, white);
-            pawn_attacks_table[black][square] = pawn_attacks(square, black);
-            knight_attacks_table[square] = knight_attacks(square);
-            king_attacks_table[square] = king_attacks(square);
+            pawn_attacks_table[white][square] = _pawn_attacks(square, white);
+            pawn_attacks_table[black][square] = _pawn_attacks(square, black);
+            knight_attacks_table[square] = _knight_attacks(square);
+            king_attacks_table[square] = _king_attacks(square);
         }
     }
 
