@@ -31,11 +31,13 @@ namespace constants
         a1, b1, c1, d1, e1, f1, g1, h1, no_square
     };
     extern const std::string square_to_coordinates[64];
+    extern const std::string promotion_to_string;
     enum {white, black, both};  // side
     enum {P, N, B, R, Q, K, p, n, b, r, q, k};  // pieces
-    enum {wk = 1, wq = 2, bk = 4, bq = 8};  // castling
+    enum {wk = 0b1000, wq = 0b0100, bk = 0b0010, bq = 0b0001};  // castling
     extern const std::string piece_to_string;
     extern const std::unordered_map<char, int> string_to_piece;
+    const int max_moves = 218;
 }
 
 namespace random_numbers

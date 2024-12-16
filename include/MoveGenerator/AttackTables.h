@@ -52,11 +52,14 @@ namespace piece_attacks
 
     U64 _slider_occupancies(int index, U64 attack_mask);
 
+    U64 _pawn_attacks(int square, int side);
     U64 pawn_attacks(int square, int side);
+    U64 _knight_attacks(int square);
     U64 knight_attacks(int square);
     U64 bishop_attacks(int square, U64 blockers);
     U64 rook_attacks(int square, U64 blockers);
     U64 queen_attacks(int square, U64 blockers);
+    U64 _king_attacks(int square);
     U64 king_attacks(int square);
 
     void init_leaper_attacks();

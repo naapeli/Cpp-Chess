@@ -1,15 +1,23 @@
 #include <iostream>
 #include <string>
-#include "../include/utils.h"
-#include "../include/MoveGenerator/AttackTables.h"
+#include <array>
+#include <span>
 
-using namespace std;
+#include "utils.h"
+#include "MoveGenerator/AttackTables.h"
+#include "MoveGenerator/MoveGenerator.h"
+
+using std::string;
+using std::array;
+using std::span;
+
 using namespace constants;
 using namespace board_utils;
 using namespace bitboard_utils;
 using namespace piece_attacks;
 using namespace random_numbers;
 using namespace magic_numbers;
+using namespace move_generator;
 
 
 int main()
@@ -21,9 +29,15 @@ int main()
     string perft_position_5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
     string perft_position_6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
 
-    board_state state = parse_fen(start_position);
-
+    init_all_attacks();
+    board_state state = parse_fen(perft_position_2);
     print_board(state);
+
+
+    array<unsigned int, max_moves> move_list;
+    span<unsigned int> moves = generate_moves(state, move_list, false);
+    print_move_list(moves);
+
 
     return 0;
 }
