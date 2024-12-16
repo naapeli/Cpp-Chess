@@ -11,6 +11,9 @@ using std::string;
 using std::array;
 using std::span;
 
+using std::cout;
+using std::endl;
+
 using namespace constants;
 using namespace board_utils;
 using namespace bitboard_utils;
@@ -22,6 +25,7 @@ using namespace move_generator;
 
 int main()
 {
+    string empty_position = "8/8/8/8/8/8/8/8 w - - 0 1";
     string start_position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     string perft_position_2 = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -";
     string perft_position_3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -";
@@ -30,9 +34,10 @@ int main()
     string perft_position_6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
 
     init_all_attacks();
-    board_state state = parse_fen(perft_position_2);
+    board_state state = parse_fen(start_position);
     print_board(state);
 
+    _init_align_masks();
 
     array<unsigned int, max_moves> move_list;
     span<unsigned int> moves = generate_moves(state, move_list, false);
