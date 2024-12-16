@@ -2,6 +2,9 @@
 #define attacks
 
 #include "utils.h"
+#include <array>
+
+using std::array;
 
 namespace piece_attacks
 {
@@ -22,6 +25,8 @@ namespace piece_attacks
     extern U64 bishop_attacks_table[64][512];
     extern U64 rook_attacks_table[64][4096];
     extern U64 king_attacks_table[64];
+    extern array<array<U64, 64>, 64> align_mask;
+    void _init_align_masks();
 
     U64 bishop_attack_masks(int square);
     U64 _bishop_attacks(int square, U64 blockers);
