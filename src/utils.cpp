@@ -1,8 +1,6 @@
 #include <iostream>
-#include <cstring>
 #include "utils.h"
 
-using std::memset;
 using namespace std;
 using namespace constants;
 using namespace bitboard_utils;
@@ -28,6 +26,15 @@ namespace bitboard_utils
             bitboard ^= 1ULL << square;
         }
         return bit;
+    }
+
+    U64 shift(U64 bitboard, int amount)
+    {
+        if (amount < 0)
+        {
+            return bitboard << -amount;
+        }
+        return bitboard >> amount;
     }
 
     int count_bits(U64 bitboard)
@@ -117,111 +124,4 @@ namespace constants
     const std::string promotion_to_string = " K B   R       Q";
     const std::unordered_map<char, int> string_to_piece = {{'P', P}, {'N', N}, {'B', B}, {'R', R}, {'Q', Q}, {'K', K},
                                                      {'p', p}, {'n', n}, {'b', b}, {'r', r}, {'q', q}, {'k', k}};
-}
-
-namespace board_utils
-{
-    board_state parse_fen(std::string fen)
-    {
-        int fen_index = 0;
-        board_state state = board_state{};
-        
-        // update bitboards
-        int square = 0;
-        while (square < 64)
-        {
-            if ((fen[fen_index] >= 'a' && fen[fen_index] <= 'z') || (fen[fen_index] >= 'A' && fen[fen_index] <= 'Z'))
-            {
-                char piece_char = fen[fen_index];
-                int piece = string_to_piece.at(piece_char);
-                set_bit(state.bitboards[piece], square);
-                square++;
-            }
-            else if (fen[fen_index] >= '0' && fen[fen_index] <= '9')
-            {
-                int offset = fen[fen_index] - '0';
-                int current_piece = -1;
-                for (int piece = P; piece <= k; piece++)
-                {
-                    if (get_bit(state.bitboards[piece], square))
-                        current_piece = piece;
-                }
-
-                square += offset;
-            }
-            fen_index++;
-        }
-        fen_index++;
-
-        // update side to move
-        (fen[fen_index] == 'w') ? (state.side = white) : (state.side = black);
-        fen_index += 2;
-
-        // update castling rights
-        while (fen[fen_index] != ' ')
-        {
-            switch (fen[fen_index])
-            {
-                case 'K': state.castle |= wk; break;
-                case 'Q': state.castle |= wq; break;
-                case 'k': state.castle |= bk; break;
-                case 'q': state.castle |= bq; break;
-                case '-': break;
-            }
-            fen_index++;
-        }
-        fen_index++;
-
-        // update the en passant square
-        if (fen[fen_index] != '-')
-        {
-            int file = fen[fen_index] - 'a';
-            int rank = 8 - (fen[fen_index + 1] - '0');
-
-            state.enpassant = rank * 8 + file;
-        }        
-        else
-            state.enpassant = no_square;
-
-        // TODO: update the halfmove clock
-        // TODO: update the fullmove counter
-
-        // update occupancies
-        for (int piece = P; piece <= K; piece++)
-            state.occupancies[white] |= state.bitboards[piece];
-        
-        for (int piece = p; piece <= k; piece++)
-            state.occupancies[black] |= state.bitboards[piece];
-        state.occupancies[both] |= state.occupancies[white];
-        state.occupancies[both] |= state.occupancies[black];
-
-        return state;
-    }
-
-    void print_board(board_state state)
-    {
-        cout << endl;
-        for (int rank = 0; rank < 8; rank++)
-        {
-            cout << 8 - rank << "   ";
-            for (int file = 0; file < 8; file++)
-            {
-                int square = rank * 8 + file;
-                int current_piece = -1;
-                for (int piece = P; piece <= k; piece++)
-                {
-                    if (get_bit(state.bitboards[piece], square))
-                        current_piece = piece;
-                }
-                cout << ((current_piece == -1) ? '.' : piece_to_string[current_piece]) << ' ';
-            }
-            cout << endl;
-        }
-        cout << endl;
-        cout << "    " << "a b c d e f g h" << endl << endl << endl;
-
-        cout << "    Side:          " <<  (state.side ? "black" : "white") << endl;
-        cout << "    Enpassant:     " <<  (state.enpassant != no_square ? square_to_coordinates[state.enpassant] : "-") << endl;
-        cout << "    Castling:      " <<  ((state.castle & wk) ? 'K' : '-') << ((state.castle & wq) ? 'Q' : '-') << ((state.castle & bk) ? 'k' : '-') << ((state.castle & bq) ? 'q' : '-') << endl << endl << endl;
-    }
 }

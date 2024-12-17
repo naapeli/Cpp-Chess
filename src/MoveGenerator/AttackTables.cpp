@@ -276,51 +276,42 @@ namespace piece_attacks
     }
 
     array<array<U64, 64>, 64> align_mask;
+    
     void _init_align_masks()
     {
+        array<array<int, 2>, 8> offsets = {{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
+
+        int row, file, _r, _f;
+        U64 mask;
         for (int king_location = 0; king_location < 64; king_location++)
         {
-            int row = king_location / 8;
-            int file = king_location % 8;
-            
-            U64 mask = 0ULL;
-            for (int r = row + 1, f = file + 1; r <= 7 && f <= 7; r++, f++)
-            {
-                set_bit(mask, r * 8 + f);
-            }
-            for (int r = row + 1, f = file + 1; r <= 7 && f <= 7; r++, f++)
-            {
-                align_mask[r * 8 + f][king_location] = mask;
-            }
+            row = king_location / 8;
+            file = king_location % 8;
+            int k;
 
-            mask = 0ULL;
-            for (int r = row - 1, f = file + 1; r >= 0 && f <= 7; r--, f++)
+            for (int i = 0; i < offsets.size(); i++)
             {
-                set_bit(mask, r * 8 + f);
-            }
-            for (int r = row - 1, f = file + 1; r >= 0 && f <= 7; r--, f++)
-            {
-                align_mask[r * 8 + f][king_location] = mask;
-            }
-
-            mask = 0ULL;
-            for (int r = row + 1, f = file - 1; r <= 7 && f >= 0; r++, f--)
-            {
-                set_bit(mask, r * 8 + f);
-            }
-            for (int r = row + 1, f = file - 1; r <= 7 && f >= 0; r++, f--)
-            {
-                align_mask[r * 8 + f][king_location] = mask;
-            }
-
-            mask = 0ULL;
-            for (int r = row - 1, f = file - 1; r >= 0 && f >= 0; r--, f--)
-            {
-                set_bit(mask, r * 8 + f);
-            }
-            for (int r = row - 1, f = file - 1; r >= 0 && f >= 0; r--, f--)
-            {
-                align_mask[r * 8 + f][king_location] = mask;
+                k = 1;
+                _r = row + offsets[i][0];
+                _f = file + offsets[i][1];
+                mask = 0ULL;
+                while (0 <= _r && _r <= 7 && 0 <= _f && _f <= 7)
+                {
+                    set_bit(mask, _r * 8 + _f);
+                    k++;
+                     _r = row + k * offsets[i][0];
+                    _f = file + k * offsets[i][1];
+                }
+                k = 1;
+                _r = row + offsets[i][0];
+                _f = file + offsets[i][1];
+                while (0 <= _r && _r <= 7 && 0 <= _f && _f <= 7)
+                {
+                    align_mask[_r * 8 + _f][king_location] = mask;
+                    k++;
+                    _r = row + k * offsets[i][0];
+                    _f = file + k * offsets[i][1];
+                }
             }
         }
     }
@@ -329,6 +320,12 @@ namespace piece_attacks
     {
         init_leaper_attacks();
         init_slider_attacks();
+    }
+
+    void init_all()
+    {
+        init_all_attacks();
+        _init_align_masks();
     }
 }
 

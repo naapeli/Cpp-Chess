@@ -1,7 +1,7 @@
-typedef unsigned long long U64;
-
 #ifndef utils
 #define utils
+
+typedef unsigned long long U64;
 
 #include <unordered_map>
 #include <string>
@@ -14,6 +14,7 @@ namespace bitboard_utils
     void set_bit(U64 &bitboard, int square);
     int get_bit(U64 bitboard, int square);
     int pop_bit(U64 &bitboard, int square);
+    U64 shift(U64 bitboard, int amount);
 
     int count_bits(U64 bitboard);
     int least_significant_bit_index(U64 bitboard);
@@ -38,6 +39,7 @@ namespace constants
     enum {white, black, both};  // side
     enum {P, N, B, R, Q, K, p, n, b, r, q, k};  // pieces
     enum {wk = 0b1000, wq = 0b0100, bk = 0b0010, bq = 0b0001};  // castling
+    enum {no_promotion = 0b0000, promotion_queen = 0b1000, promotion_rook = 0b0100, promotion_bishop = 0b0010, promotion_knight = 0b0001};
     extern const string piece_to_string;
     extern const unordered_map<char, int> string_to_piece;
     const int max_moves = 218;
@@ -48,22 +50,6 @@ namespace random_numbers
     unsigned int random_32_bit_number();
     U64 random_64_bit_number();
     U64 random_magic_number();
-}
-
-namespace board_utils
-{
-    struct board_state {
-        U64 bitboards[12];
-        int castle;  // KQkq
-        int enpassant;
-        int side;
-        U64 occupancies[3];
-        // TODO: half and full move counters
-    };
-
-    board_state parse_fen(std::string fen);
-
-    void print_board(board_state board);
 }
 
 #endif // utils
