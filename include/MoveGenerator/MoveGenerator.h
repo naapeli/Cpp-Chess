@@ -20,8 +20,9 @@ namespace move_generator
     bool in_check_after_en_passant(board_state &board, int source, int enemy_pawn_location);
     void print_attacked(board_state &board);
     void print_move_list(span<unsigned int> moves);
-    int perft(board_state board, int depth, bool no_quiet_moves);
-    void perft_debug(board_state board, int depth, bool no_quiet_moves);
+    int perft(board_state board, int depth);
+    void perft_debug(board_state board, int depth);
+    void perft_test_all_moves();
 
     struct king_info {
         int n_checks = 0;
@@ -36,12 +37,13 @@ namespace move_generator
     void _generate_knight_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index);
     void _generate_slider_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index);
 
-    unsigned int encode_move(int source, int target, int piece, int promotion, bool capture, bool double_push, bool enpassant, bool castle);
+    int find_captured_piece(board_state &board, int square);
+    unsigned int encode_move(int source, int target, int piece, int promotion, int capture, bool double_push, bool enpassant, bool castle);
     int move_source(unsigned int  move);
     int move_target(unsigned int  move);
     int move_piece(unsigned int  move);
     int move_promotion(unsigned int  move);
-    bool move_capture(unsigned int  move);
+    int move_capture(unsigned int  move);
     bool move_double_push(unsigned int move);
     bool move_enpassant(unsigned int  move);
     bool move_castle(unsigned int  move);

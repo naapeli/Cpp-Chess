@@ -19,6 +19,7 @@ using move_generator::generate_moves;
 using move_generator::print_move_list;
 using move_generator::perft;
 using move_generator::perft_debug;
+using move_generator::perft_test_all_moves;
 using move_generator::encode_move;
 using piece_attacks::init_all;
 
@@ -42,20 +43,22 @@ int main()
     string perft_position_6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
 
     init_all();
-    board_state state = parse_fen(perft_position_2);
-    // state = make_move(state, encode_move(f2, f4, P, no_promotion, 0, 1, 0, 0));
-    // state = make_move(state, encode_move(e7, e5, p, no_promotion, 0, 1, 0, 0));
-    // state = make_move(state, encode_move(e1, f2, K, no_promotion, 0, 0, 0, 0));
-    // state = make_move(state, encode_move(d8, f6, q, no_promotion, 0, 0, 0, 0));
+    board_state state = parse_fen(perft_position_4);
+    // state = make_move(state, encode_move(b1, c3, N, no_promotion, no_piece, 0, 0, 0));
+    // state = make_move(state, encode_move(h8, g8, r, no_promotion, no_piece, 0, 0, 0));
+    // state = make_move(state, encode_move(a1, b1, R, no_promotion, no_piece, 0, 0, 0));
+    // state = make_move(state, encode_move(g8, h8, r, no_promotion, no_piece, 0, 0, 0));
+    // state = make_move(state, encode_move(c7, c5, p, no_promotion, no_piece, 1, 0, 0));
     print_board(state);
 
+    array<unsigned int, max_moves> move_list;
+    span<unsigned int> moves = generate_moves(state, move_list, true);
+    print_move_list(moves);
 
-    // array<unsigned int, max_moves> move_list;
-    // span<unsigned int> moves = generate_moves(state, move_list, false);
-    // print_move_list(moves);
+    // int depth = 5;
+    // perft_debug(state, depth, false);
 
-    int depth = 5;
-    perft_debug(state, depth, false);
+    // perft_test_all_moves();
 
     return 0;
 }

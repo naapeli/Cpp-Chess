@@ -37,7 +37,7 @@ namespace constants
     extern const string square_to_coordinates[64];
     extern const string promotion_to_string;
     enum {white, black, both};  // side
-    enum {P, N, B, R, Q, K, p, n, b, r, q, k};  // pieces
+    enum {P, N, B, R, Q, K, p, n, b, r, q, k, no_piece};  // pieces
     enum {wk = 0b1000, wq = 0b0100, bk = 0b0010, bq = 0b0001};  // castling
     enum {no_promotion = 0b0000, promotion_queen = 0b1000, promotion_rook = 0b0100, promotion_bishop = 0b0010, promotion_knight = 0b0001};
     extern const string piece_to_string;

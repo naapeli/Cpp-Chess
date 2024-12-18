@@ -7,12 +7,15 @@
 #include <array>
 #include <span>
 #include <format>
+#include <chrono>
 
 using std::format;
 using std::cout;
 using std::endl;
 using std::span;
 using std::array;
+
+using std::chrono::high_resolution_clock;
 
 using piece_attacks::pawn_attacks;
 using piece_attacks::knight_attacks;
@@ -26,6 +29,7 @@ using piece_attacks::not_h_file;
 using board::board_state;
 using board::make_move;
 using board_utils::print_board;
+using board_utils::parse_fen;
 using namespace constants;
 using namespace bitboard_utils;
 
@@ -50,7 +54,7 @@ namespace move_generator
         U64 enemy_orthogonal_sliders = board.side == white ? (board.bitboards[q] | board.bitboards[r]) : (board.bitboards[Q] | board.bitboards[R]);
         if (enemy_orthogonal_sliders)
         {
-            U64 blockers = board.occupancies[both] ^ ((1 << source) | (1 << enemy_pawn_location) | (1 << board.enpassant));
+            U64 blockers = board.occupancies[both] ^ ((1ULL << source) | (1ULL << enemy_pawn_location) | (1ULL << board.enpassant));
             int king_location = least_significant_bit_index((board.side == white ? board.bitboards[K] : board.bitboards[k]));
             U64 attacks_board = rook_attacks(king_location, blockers);
             return (attacks_board & enemy_orthogonal_sliders) != 0;
@@ -83,17 +87,17 @@ namespace move_generator
             unsigned int move = moves[i];
             cout << square_to_coordinates[move_source(move)] << square_to_coordinates[move_target(move)];
             cout << promotion_to_string[move_promotion(move)] << "     " << piece_to_string[move_piece(move)];
-            cout << "          " << move_capture(move) << "            ";
+            cout << "          " << piece_to_string[move_capture(move)] << "            ";
             cout << move_enpassant(move) << "               " << move_castle(move) << endl;
         }
 
         cout << endl << "Number of moves:        " << moves.size() << endl << endl;
     }
 
-    int perft(board_state board, int depth, bool no_quiet_moves)
+    int perft(board_state board, int depth)
     {
         array<unsigned int, max_moves> move_list;
-        span<unsigned int> moves = generate_moves(board, move_list, no_quiet_moves);
+        span<unsigned int> moves = generate_moves(board, move_list, false);
         if (depth == 0)
         {
             return 1;
@@ -107,26 +111,55 @@ namespace move_generator
         {
             unsigned int move = moves[i];
             board_state new_board = make_move(board, move);
-            n_moves += perft(new_board, depth - 1, no_quiet_moves);
+            n_moves += perft(new_board, depth - 1);
         }
         return n_moves;
     }
 
-    void perft_debug(board_state board, int depth, bool no_quiet_moves)
+    void perft_debug(board_state board, int depth)
     {
         array<unsigned int, max_moves> move_list;
-        span<unsigned int> moves = generate_moves(board, move_list, no_quiet_moves);
+        span<unsigned int> moves = generate_moves(board, move_list, false);
         cout << "Move     number of moves from position" << endl;
         int n_moves = 0;
         for (int i = 0; i < moves.size(); i++)
         {
             int move = moves[i];
             board_state new_board = make_move(board, move);
-            int n_submoves = perft(new_board, depth - 1, no_quiet_moves);
+            int n_submoves = perft(new_board, depth - 1);
             n_moves += n_submoves;
             cout << move_to_string(move) << "    " << n_submoves << endl;
         }
         cout << "Total number of moves at depth " << depth << ": " << n_moves << endl;
+    }
+
+    void perft_test_all_moves()
+    {
+        string start_position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        string perft_position_2 = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -";
+        string perft_position_3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -";
+        string perft_position_4 = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
+        string perft_position_5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+        string perft_position_6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+
+        auto start = high_resolution_clock::now();
+
+        board_state board = parse_fen(start_position);
+        cout << "Generated moves: " << perft(board, 6) << " - True moves: " << 119060324 << endl;
+        board = parse_fen(perft_position_2);
+        cout << "Generated moves: " << perft(board, 5) << " - True moves: " << 193690690 << endl;
+        board = parse_fen(perft_position_3);
+        cout << "Generated moves: " << perft(board, 7) << " - True moves: " << 178633661 << endl;
+        board = parse_fen(perft_position_4);
+        cout << "Generated moves: " << perft(board, 6) << " - True moves: " << 706045033 << endl;
+        board = parse_fen(perft_position_5);
+        cout << "Generated moves: " << perft(board, 5) << " - True moves: " << 89941194 << endl;
+        board = parse_fen(perft_position_6);
+        cout << "Generated moves: " << perft(board, 5) << " - True moves: " << 164075551 << endl;
+
+        auto stop = high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        cout << "Time taken: " << duration.count() << " ms" << endl;
     }
 
     span<unsigned int> generate_moves(board_state &board, array<unsigned int, max_moves> &move_list, bool no_quiet_moves)
@@ -184,7 +217,7 @@ namespace move_generator
                 int source = target + 8 * direction;
                 if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
                 {
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 0, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, no_piece, 0, 0, 0);
                 }
                 pop_bit(push_no_promotion, target);
             }
@@ -194,7 +227,7 @@ namespace move_generator
                 int source = target + 16 * direction;
                 if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
                 {
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 0, 1, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, no_piece, 1, 0, 0);
                 }
                 pop_bit(double_push, target);
             }
@@ -207,7 +240,7 @@ namespace move_generator
             int source = target + 7 * direction;
             if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
             {
-                moves[move_index++] = encode_move(source, target, piece, no_promotion, 1, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);
             }
             pop_bit(capture_no_promotion_1, target);
         }
@@ -217,7 +250,7 @@ namespace move_generator
             int source = target + 9 * direction;
             if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
             {
-                moves[move_index++] = encode_move(source, target, piece, no_promotion, 1, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);
             }
             pop_bit(capture_no_promotion_2, target);
         }
@@ -229,10 +262,10 @@ namespace move_generator
             int source = target + 8 * direction;
             if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
             {
-                moves[move_index++] = encode_move(source, target, piece, promotion_queen, 0, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_rook, 0, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_bishop, 0, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_knight, 0, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_queen, no_piece, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_rook, no_piece, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_bishop, no_piece, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_knight, no_piece, 0, 0, 0);
             }
             pop_bit(push_promotions, target);
         }
@@ -242,10 +275,10 @@ namespace move_generator
             int source = target + 7 * direction;
             if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
             {
-                moves[move_index++] = encode_move(source, target, piece, promotion_queen, 1, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_rook, 1, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_bishop, 1, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_knight, 1, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_queen, find_captured_piece(board, target), 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_rook, find_captured_piece(board, target), 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_bishop, find_captured_piece(board, target), 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_knight, find_captured_piece(board, target), 0, 0, 0);
             }
             pop_bit(capture_promotions_1, target);
         }
@@ -255,31 +288,35 @@ namespace move_generator
             int source = target + 9 * direction;
             if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[target][king_location]))
             {
-                moves[move_index++] = encode_move(source, target, piece, promotion_queen, 1, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_rook, 1, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_bishop, 1, 0, 0, 0);
-                moves[move_index++] = encode_move(source, target, piece, promotion_knight, 1, 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_queen, find_captured_piece(board, target), 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_rook, find_captured_piece(board, target), 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_bishop, find_captured_piece(board, target), 0, 0, 0);
+                moves[move_index++] = encode_move(source, target, piece, promotion_knight, find_captured_piece(board, target), 0, 0, 0);
             }
             pop_bit(capture_promotions_2, target);
         }
 
         // en passant
-        U64 enpassant_board = 1 << board.enpassant;
-        if (board.enpassant != no_square && (enpassant_board & info.check_rays))
+        if (board.enpassant != no_square)
         {
-            int enemy = board.side == white ? black : white;
-            U64 pawns_able_to_en_passant = pawn_attacks(board.enpassant, enemy) & board.bitboards[piece];
-            while (pawns_able_to_en_passant)
+            U64 capture_pawn_location = board.side == white ? board.enpassant + 8 : board.enpassant - 8;
+            U64 capture_board = 1ULL << capture_pawn_location;
+            if (capture_board & info.check_rays)
             {
-                int source = least_significant_bit_index(pawns_able_to_en_passant);
-                if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[board.enpassant][king_location]))
+                int enemy = board.side == white ? black : white;
+                U64 pawns_able_to_en_passant = pawn_attacks(board.enpassant, enemy) & board.bitboards[piece];
+                while (pawns_able_to_en_passant)
                 {
-                    if (!in_check_after_en_passant(board, source, (board.side == white ? board.enpassant + 8 : board.enpassant - 8)))
+                    int source = least_significant_bit_index(pawns_able_to_en_passant);
+                    if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[board.enpassant][king_location]))
                     {
-                        moves[move_index++] = encode_move(source, board.enpassant, piece, no_promotion, 1, 0, 1, 0);
+                        if (!in_check_after_en_passant(board, source, capture_pawn_location))
+                        {
+                            moves[move_index++] = encode_move(source, board.enpassant, piece, no_promotion, find_captured_piece(board, capture_pawn_location), 0, 1, 0);
+                        }
                     }
+                    pop_bit(pawns_able_to_en_passant, source);
                 }
-                pop_bit(pawns_able_to_en_passant, source);
             }
         }
     }
@@ -287,6 +324,7 @@ namespace move_generator
     void _generate_king_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index)
     {
         int piece = (board.side == white) ? K : k;
+        int rook = (board.side == white) ? R : r;
         int enemy_color = (board.side == white) ? black : white;
 
         // before using is_square_attacked, remove own king from the board
@@ -300,40 +338,44 @@ namespace move_generator
         {
             // white kingside castle
             int castling_available = board.castle & wk;
-            int no_pieces_between = !get_bit(board.occupancies[both], f1) && !get_bit(board.occupancies[both], g1);
-            int king_not_through_check = !is_square_attacked(e1, board) && !is_square_attacked(f1, board) && !is_square_attacked(g1, board);
-            if (castling_available && no_pieces_between && king_not_through_check)
+            bool no_pieces_between = !get_bit(board.occupancies[both], f1) && !get_bit(board.occupancies[both], g1);
+            bool king_not_through_check = !is_square_attacked(e1, board) && !is_square_attacked(f1, board) && !is_square_attacked(g1, board);
+            bool king_and_rook_present = king_location == e1 && get_bit(board.bitboards[rook], h1);
+            if (castling_available && no_pieces_between && king_not_through_check && king_and_rook_present)
             {
-                moves[move_index++] = encode_move(e1, g1, piece, no_promotion, 0, 0, 0, 1);
+                moves[move_index++] = encode_move(e1, g1, piece, no_promotion, no_piece, 0, 0, 1);
             }
 
             // white queenside castle
             castling_available = board.castle & wq;
             no_pieces_between = !get_bit(board.occupancies[both], d1) && !get_bit(board.occupancies[both], c1) && !get_bit(board.occupancies[both], b1);
             king_not_through_check = !is_square_attacked(e1, board) && !is_square_attacked(d1, board) && !is_square_attacked(c1, board);
-            if (castling_available && no_pieces_between && king_not_through_check)
+            king_and_rook_present = king_location == e1 && get_bit(board.bitboards[rook], a1);
+            if (castling_available && no_pieces_between && king_not_through_check && king_and_rook_present)
             {
-                moves[move_index++] = encode_move(e1, c1, piece, no_promotion, 0, 0, 0, 1);
+                moves[move_index++] = encode_move(e1, c1, piece, no_promotion, no_piece, 0, 0, 1);
             }
         }
         else if (board.side == black && !no_quiet_moves)
         {
             // black kingside castle
             int castling_available = board.castle & bk;
-            int no_pieces_between = !get_bit(board.occupancies[both], f8) && !get_bit(board.occupancies[both], g8);
-            int king_not_through_check = !is_square_attacked(e8, board) && !is_square_attacked(f8, board) && !is_square_attacked(g8, board);
-            if (castling_available && no_pieces_between && king_not_through_check)
+            bool no_pieces_between = !get_bit(board.occupancies[both], f8) && !get_bit(board.occupancies[both], g8);
+            bool king_not_through_check = !is_square_attacked(e8, board) && !is_square_attacked(f8, board) && !is_square_attacked(g8, board);
+            bool king_and_rook_present = king_location == e8 && get_bit(board.bitboards[rook], h8);
+            if (castling_available && no_pieces_between && king_not_through_check && king_and_rook_present)
             {
-                moves[move_index++] = encode_move(e8, g8, piece, no_promotion, 0, 0, 0, 1);
+                moves[move_index++] = encode_move(e8, g8, piece, no_promotion, no_piece, 0, 0, 1);
             }
 
             // black queenside castle
             castling_available = board.castle & bq;
             no_pieces_between = !get_bit(board.occupancies[both], d8) && !get_bit(board.occupancies[both], c8) && !get_bit(board.occupancies[both], b8);
             king_not_through_check = !is_square_attacked(e8, board) && !is_square_attacked(d8, board) && !is_square_attacked(c8, board);
-            if (castling_available && no_pieces_between && king_not_through_check)
+            king_and_rook_present = king_location == e8 && get_bit(board.bitboards[rook], a8);
+            if (castling_available && no_pieces_between && king_not_through_check && king_and_rook_present)
             {
-                moves[move_index++] = encode_move(e8, c8, piece, no_promotion, 0, 0, 0, 1);
+                moves[move_index++] = encode_move(e8, c8, piece, no_promotion, no_piece, 0, 0, 1);
             }
         }
 
@@ -350,10 +392,10 @@ namespace move_generator
             {
                 if (!get_bit(board.occupancies[enemy_color], target))
                     // non-capture
-                    moves[move_index++] = encode_move(king_location, target, piece, no_promotion, 0, 0, 0, 0);
+                    moves[move_index++] = encode_move(king_location, target, piece, no_promotion, no_piece, 0, 0, 0);
                 else
                     // capture
-                    moves[move_index++] = encode_move(king_location, target, piece, no_promotion, 1, 0, 0, 0);
+                    moves[move_index++] = encode_move(king_location, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);
             }
             pop_bit(attacks_board, target);
         }
@@ -382,10 +424,10 @@ namespace move_generator
                 int target = least_significant_bit_index(attacks_board);
                 if (!get_bit(board.occupancies[enemy_color], target))
                     // non-capture
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 0, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, no_piece, 0, 0, 0);
                 else
                     // capture
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 1, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);
                 pop_bit(attacks_board, target);
             }
             pop_bit(bitboard, source);
@@ -428,10 +470,10 @@ namespace move_generator
                 int target = least_significant_bit_index(attacks_board);
                 if (get_bit(board.occupancies[enemy_color], target))
                     // capture
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 1, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);
                 else
                     // non-capture
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 0, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, no_piece, 0, 0, 0);
                 pop_bit(attacks_board, target);
             }
             pop_bit(orthogonal_bitboard, source);
@@ -456,12 +498,14 @@ namespace move_generator
             while (attacks_board)
             {
                 int target = least_significant_bit_index(attacks_board);
+                // if (get_bit(board.occupancies[enemy_color], target))
+                //     cout << piece_to_string[find_captured_piece(board, target)] << endl;
                 if (get_bit(board.occupancies[enemy_color], target))
                     // capture
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 1, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);
                 else
                     // non-capture
-                    moves[move_index++] = encode_move(source, target, piece, no_promotion, 0, 0, 0, 0);
+                    moves[move_index++] = encode_move(source, target, piece, no_promotion, no_piece, 0, 0, 0);
                 pop_bit(attacks_board, target);
             }
             pop_bit(diagonal_bitboard, source);
@@ -588,10 +632,23 @@ namespace move_generator
         return info;
     }
 
-
-    unsigned int encode_move(int source, int target, int piece, int promotion, bool capture, bool double_push, bool enpassant, bool castle)
+    int find_captured_piece(board_state &board, int square)
     {
-        unsigned int move = source | (target << 6) | (piece << 12) | (promotion << 16) | (capture << 20) | (double_push << 21) | (enpassant << 22) | (castle << 23);
+        int pawn = board.side == white ? 6 : 0;
+        int king = board.side == white ? 11 : 5;
+        for (int taken_piece = pawn; taken_piece <= king; taken_piece++)
+        {
+            if (get_bit(board.bitboards[taken_piece], square))
+            {
+                return taken_piece;
+            }
+        }
+        return no_piece;
+    }
+
+    unsigned int encode_move(int source, int target, int piece, int promotion, int capture, bool double_push, bool enpassant, bool castle)
+    {
+        unsigned int move = source | (target << 6) | (piece << 12) | (promotion << 16) | (capture << 20) | (double_push << 24) | (enpassant << 25) | (castle << 26);
         return move;
     }
     
@@ -615,24 +672,24 @@ namespace move_generator
         return (move >> 16) & 0b1111;
     }
 
-    bool move_capture(unsigned int move)
+    int move_capture(unsigned int move)
     {
-        return (move >> 20) & 1;
+        return (move >> 20) & 0b1111;
     }
 
     bool move_double_push(unsigned int move)
     {
-        return (move >> 21) & 1;
+        return (move >> 24) & 1;
     }
 
     bool move_enpassant(unsigned int move)
     {
-        return (move >> 22) & 1;
+        return (move >> 25) & 1;
     }
 
     bool move_castle(unsigned int move)
     {
-        return (move >> 23) & 1;
+        return (move >> 26) & 1;
     }
 
     string move_to_string(unsigned int move)
