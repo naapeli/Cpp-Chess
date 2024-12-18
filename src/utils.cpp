@@ -120,8 +120,8 @@ namespace constants
         "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
         "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     };
-    const std::string piece_to_string = "PNBRQKpnbrqk";
-    const std::string promotion_to_string = " K B   R       Q";
+    const std::string piece_to_string = "PNBRQKpnbrqk.";
+    const std::string promotion_to_string = " NB R   Q";
     const std::unordered_map<char, int> string_to_piece = {{'P', P}, {'N', N}, {'B', B}, {'R', R}, {'Q', Q}, {'K', K},
                                                      {'p', p}, {'n', n}, {'b', b}, {'r', r}, {'q', q}, {'k', k}};
 }
