@@ -2,21 +2,16 @@
 #include "utils.h"
 #include "Board/board.h"
 #include "MoveGenerator/MoveGenerator.h"
+#include "Engine/transpositionTable.h"
+
 
 using namespace bitboard_utils;
 using namespace constants;
+using namespace zobrist;
 
 using std::cout;
 using std::endl;
 using board::board_state;
-using move_generator::move_source;
-using move_generator::move_target;
-using move_generator::move_piece;
-using move_generator::move_capture;
-using move_generator::move_promotion;
-using move_generator::move_double_push;
-using move_generator::move_enpassant;
-using move_generator::move_castle;
 
 
 namespace board
@@ -31,8 +26,10 @@ namespace board
         pop_bit(board.bitboards[piece], source);
         pop_bit(board.occupancies[board.side], source);
         set_bit(board.occupancies[board.side], target);
+        board.zobrist_hash ^= zobrist_pieces[piece][source];
 
         // update castling rights
+        board.zobrist_hash ^= zobrist_castle[board.castle];
         if (piece == R)
         {
             if (source == h1) board.castle &= ~wk;
@@ -45,30 +42,36 @@ namespace board
         }
         if (piece == K) board.castle &= 0b0011;
         else if (piece == k) board.castle &= 0b1100;
+        board.zobrist_hash ^= zobrist_castle[board.castle];
 
         // set piece at new location considering possible promotion
         int promotion = move_promotion(move);
         if (promotion == no_promotion)
         {
             set_bit(board.bitboards[piece], target);
+            board.zobrist_hash ^= zobrist_pieces[piece][target];
         }
         else
         {
             if (promotion == promotion_queen)
             {
                 set_bit(board.side == white ? board.bitboards[Q] : board.bitboards[q], target);
+                board.zobrist_hash ^= zobrist_pieces[board.side == white ? Q : q][target];
             }
             else if (promotion == promotion_rook)
             {
                 set_bit(board.side == white ? board.bitboards[R] : board.bitboards[r], target);
+                board.zobrist_hash ^= zobrist_pieces[board.side == white ? R : r][target];
             }
             else if (promotion == promotion_bishop)
             {
                 set_bit(board.side == white ? board.bitboards[B] : board.bitboards[b], target);
+                board.zobrist_hash ^= zobrist_pieces[board.side == white ? B : b][target];
             }
             else if (promotion == promotion_knight)
             {
                 set_bit(board.side == white ? board.bitboards[N] : board.bitboards[n], target);
+                board.zobrist_hash ^= zobrist_pieces[board.side == white ? N : n][target];
             }
         }
 
@@ -76,24 +79,18 @@ namespace board
         int taken_piece = move_capture(move);
         if (taken_piece != no_piece)
         {
-            int pawn = enemy == white ? 0 : 6;
-            int king = enemy == white ? 5 : 11;
             int piece_location = move_enpassant(move) ? (board.side == white ? target + 8 : target - 8) : target;
             pop_bit(board.occupancies[enemy], piece_location);
-            // for (int taken_piece = pawn; taken_piece <= king; taken_piece++)
-            // {
-            //     if (get_bit(board.bitboards[taken_piece], piece_location))
-            //     {
-            //         pop_bit(board.bitboards[taken_piece], piece_location);
-            //     }
-            // }
             pop_bit(board.bitboards[taken_piece], piece_location);
+            board.zobrist_hash ^= zobrist_pieces[taken_piece][piece_location];
         }
 
         // set en passant square if double push
+        if (board.enpassant != no_square) board.zobrist_hash ^= zobrist_enpassant[board.enpassant];
         if (move_double_push(move))
         {
             board.enpassant = board.side == white ? target + 8 : target - 8;
+            board.zobrist_hash ^= zobrist_enpassant[board.enpassant];
         }
         else
         {
@@ -111,6 +108,8 @@ namespace board
                     pop_bit(board.occupancies[board.side], h1);
                     set_bit(board.bitboards[R], f1);
                     set_bit(board.occupancies[board.side], f1);
+                    board.zobrist_hash ^= zobrist_pieces[R][h1];
+                    board.zobrist_hash ^= zobrist_pieces[R][f1];
                 }
                 else if (target == c1)
                 {
@@ -118,6 +117,8 @@ namespace board
                     pop_bit(board.occupancies[board.side], a1);
                     set_bit(board.bitboards[R], d1);
                     set_bit(board.occupancies[board.side], d1);
+                    board.zobrist_hash ^= zobrist_pieces[R][a1];
+                    board.zobrist_hash ^= zobrist_pieces[R][d1];
                 }
             }
             else
@@ -128,6 +129,8 @@ namespace board
                     pop_bit(board.occupancies[board.side], h8);
                     set_bit(board.bitboards[r], f8);
                     set_bit(board.occupancies[board.side], f8);
+                    board.zobrist_hash ^= zobrist_pieces[r][h8];
+                    board.zobrist_hash ^= zobrist_pieces[r][f8];
                 }
                 else if (target == c8)
                 {
@@ -135,6 +138,8 @@ namespace board
                     pop_bit(board.occupancies[board.side], a8);
                     set_bit(board.bitboards[r], d8);
                     set_bit(board.occupancies[board.side], d8);
+                    board.zobrist_hash ^= zobrist_pieces[r][a8];
+                    board.zobrist_hash ^= zobrist_pieces[r][d8];
                 }
             }
         }
@@ -143,8 +148,74 @@ namespace board
 
         // update the player to move
         board.side = board.side == white ? black : white;
+        board.zobrist_hash ^= zobrist_side;
 
         return board;
+    }
+
+    int find_captured_piece(board_state &board, int square)
+    {
+        int pawn = board.side == white ? 6 : 0;
+        int king = board.side == white ? 11 : 5;
+        for (int taken_piece = pawn; taken_piece <= king; taken_piece++)
+        {
+            if (get_bit(board.bitboards[taken_piece], square))
+            {
+                return taken_piece;
+            }
+        }
+        return no_piece;
+    }
+
+    unsigned int encode_move(int source, int target, int piece, int promotion, int capture, bool double_push, bool enpassant, bool castle)
+    {
+        unsigned int move = source | (target << 6) | (piece << 12) | (promotion << 16) | (capture << 20) | (double_push << 24) | (enpassant << 25) | (castle << 26);
+        return move;
+    }
+    
+    int move_source(unsigned int move)
+    {
+        return move & 0b111111;
+    }
+
+    int move_target(unsigned int move)
+    {
+        return (move >> 6) & 0b111111;
+    }
+
+    int move_piece(unsigned int move)
+    {
+        return (move >> 12) & 0b1111;
+    }
+
+    int move_promotion(unsigned int move)
+    {
+        return (move >> 16) & 0b1111;
+    }
+
+    int move_capture(unsigned int move)
+    {
+        return (move >> 20) & 0b1111;
+    }
+
+    bool move_double_push(unsigned int move)
+    {
+        return (move >> 24) & 1;
+    }
+
+    bool move_enpassant(unsigned int move)
+    {
+        return (move >> 25) & 1;
+    }
+
+    bool move_castle(unsigned int move)
+    {
+        return (move >> 26) & 1;
+    }
+
+    string move_to_string(unsigned int move)
+    {
+        return square_to_coordinates[move_source(move)] + square_to_coordinates[move_target(move)] + promotion_to_string[move_promotion(move)];
     }
 }
 
@@ -212,9 +283,6 @@ namespace board_utils
         else
             state.enpassant = no_square;
 
-        // TODO: update the halfmove clock
-        // TODO: update the fullmove counter
-
         // update occupancies
         for (int piece = P; piece <= K; piece++)
             state.occupancies[white] |= state.bitboards[piece];
@@ -224,10 +292,34 @@ namespace board_utils
         state.occupancies[both] |= state.occupancies[white];
         state.occupancies[both] |= state.occupancies[black];
 
+        // TODO: update the halfmove clock
+        // TODO: update the fullmove counter
+
+        // recalculate the zobrist hash
+        state.zobrist_hash = get_zobrist_hash(state);
         return state;
     }
 
-    void print_board(board_state state)
+    U64 get_zobrist_hash(board_state &board)
+    {
+        U64 zobrist_hash = 0ULL;
+        for (int piece = P; piece <= k; piece++)
+        {
+            U64 bitboard = board.bitboards[piece];
+            while (bitboard)
+            {
+                int square = least_significant_bit_index(bitboard);
+                zobrist_hash ^= zobrist_pieces[piece][square];
+                pop_bit(bitboard, square);
+            }
+        }
+        zobrist_hash ^= zobrist_castle[board.castle];
+        if (board.side == black) zobrist_hash ^= zobrist_side;
+        if (board.enpassant != no_square) zobrist_hash ^= zobrist_enpassant[board.enpassant];
+        return zobrist_hash;
+    }
+
+    void print_board(board_state &state)
     {
         cout << endl;
         for (int rank = 0; rank < 8; rank++)
@@ -249,8 +341,9 @@ namespace board_utils
         cout << endl;
         cout << "    " << "a b c d e f g h" << endl << endl << endl;
 
-        cout << "    Side:          " <<  (state.side ? "black" : "white") << endl;
-        cout << "    Enpassant:     " <<  (state.enpassant != no_square ? square_to_coordinates[state.enpassant] : "-") << endl;
-        cout << "    Castling:      " <<  ((state.castle & wk) ? 'K' : '-') << ((state.castle & wq) ? 'Q' : '-') << ((state.castle & bk) ? 'k' : '-') << ((state.castle & bq) ? 'q' : '-') << endl << endl << endl;
+        cout << "    Side:          " << (state.side ? "black" : "white") << endl;
+        cout << "    Enpassant:     " << (state.enpassant != no_square ? square_to_coordinates[state.enpassant] : "-") << endl;
+        cout << "    Castling:      " << ((state.castle & wk) ? 'K' : '-') << ((state.castle & wq) ? 'Q' : '-') << ((state.castle & bk) ? 'k' : '-') << ((state.castle & bq) ? 'q' : '-') << endl;
+        cout << "    Hash key:      " << state.zobrist_hash << endl << endl << endl;
     }
 }

@@ -1,5 +1,6 @@
 #include "MoveGenerator/AttackTables.h"
 #include "utils.h"
+#include "Engine/transpositionTable.h"
 #include <algorithm>
 #include <iostream>
 
@@ -10,6 +11,7 @@ using std::endl;
 using namespace bitboard_utils;
 using namespace constants;
 using namespace random_numbers;
+using zobrist::init_zobrist_keys;
 
 
 namespace piece_attacks
@@ -326,6 +328,7 @@ namespace piece_attacks
     {
         init_all_attacks();
         _init_align_masks();
+        init_zobrist_keys();
     }
 }
 

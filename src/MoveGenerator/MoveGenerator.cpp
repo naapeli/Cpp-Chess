@@ -33,6 +33,16 @@ using board_utils::parse_fen;
 using namespace constants;
 using namespace bitboard_utils;
 
+using board::encode_move;
+using board::move_source;
+using board::move_target;
+using board::move_capture;
+using board::move_promotion;
+using board::move_enpassant;
+using board::move_castle;
+using board::move_piece;
+using board::move_to_string;
+
 
 namespace move_generator
 {
@@ -630,70 +640,5 @@ namespace move_generator
         }
 
         return info;
-    }
-
-    int find_captured_piece(board_state &board, int square)
-    {
-        int pawn = board.side == white ? 6 : 0;
-        int king = board.side == white ? 11 : 5;
-        for (int taken_piece = pawn; taken_piece <= king; taken_piece++)
-        {
-            if (get_bit(board.bitboards[taken_piece], square))
-            {
-                return taken_piece;
-            }
-        }
-        return no_piece;
-    }
-
-    unsigned int encode_move(int source, int target, int piece, int promotion, int capture, bool double_push, bool enpassant, bool castle)
-    {
-        unsigned int move = source | (target << 6) | (piece << 12) | (promotion << 16) | (capture << 20) | (double_push << 24) | (enpassant << 25) | (castle << 26);
-        return move;
-    }
-    
-    int move_source(unsigned int move)
-    {
-        return move & 0b111111;
-    }
-
-    int move_target(unsigned int move)
-    {
-        return (move >> 6) & 0b111111;
-    }
-
-    int move_piece(unsigned int move)
-    {
-        return (move >> 12) & 0b1111;
-    }
-
-    int move_promotion(unsigned int move)
-    {
-        return (move >> 16) & 0b1111;
-    }
-
-    int move_capture(unsigned int move)
-    {
-        return (move >> 20) & 0b1111;
-    }
-
-    bool move_double_push(unsigned int move)
-    {
-        return (move >> 24) & 1;
-    }
-
-    bool move_enpassant(unsigned int move)
-    {
-        return (move >> 25) & 1;
-    }
-
-    bool move_castle(unsigned int move)
-    {
-        return (move >> 26) & 1;
-    }
-
-    string move_to_string(unsigned int move)
-    {
-        return square_to_coordinates[move_source(move)] + square_to_coordinates[move_target(move)] + promotion_to_string[move_promotion(move)];
     }
 }

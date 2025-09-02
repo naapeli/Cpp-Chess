@@ -43,6 +43,10 @@ namespace constants
     extern const string piece_to_string;
     extern const unordered_map<char, int> string_to_piece;
     const int max_moves = 218;
+
+    const int check_mate_score = 50000;
+    const int alpha_beta_bounds_start = 2 * check_mate_score;
+    const int invalid_evaluation = 2 * check_mate_score + 1;
 }
 
 namespace random_numbers
