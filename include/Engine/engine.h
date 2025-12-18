@@ -6,6 +6,7 @@
 
 #include <array>
 #include <span>
+#include <chrono>
 
 using board::board_state;
 using namespace constants;
@@ -28,11 +29,15 @@ class Engine {
         void sort_moves(span<unsigned int> moves, bool score_pv_move, int depth_from_root);
         int late_move_reduction(unsigned int move, int depth, int move_priority_index, int search_extension);
         int search_extension(unsigned int move, int total_extension, bool in_check, int n_moves);
+        bool time_up();
 
         int nodes = 0;
         static const int max_ply = 64;
         array<array<unsigned int, max_ply>, max_ply> pv_table;
         array<int, max_ply> pv_length;
+
+        std::chrono::time_point<std::chrono::steady_clock> search_start_time;
+        std::chrono::milliseconds time_limit{10000};  // Time for the search
 
         array<array<unsigned int, 2>, max_ply> killer_moves;
         array<array<unsigned int, 12>, 64> history_moves;
@@ -59,6 +64,8 @@ class Engine {
         const int non_quiet_bonus = 10000;
         const int first_killer_bonus = 9000;
         const int second_killer_bonus = 8000;
+
+        int delta_cutoff = material_score[4];
 
         const array<int, 64> mirror_score =
         {

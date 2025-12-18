@@ -8,10 +8,12 @@
 #include <array>
 #include <vector>
 #include <span>
+#include <chrono>
 
 using move_generator::generate_moves, move_generator::is_square_attacked, move_generator::print_move_list;
 using board::make_move, board::move_to_string, board::move_capture;
 using board::move_piece, board::move_promotion, board::move_target;
+using board::is_promoting;
 using namespace constants;
 using namespace bitboard_utils;
 using transposition_table::add_move_to_table, transposition_table::get_evaluation_from_table;
@@ -23,8 +25,10 @@ using std::array, std::vector, std::span;
 
 int Engine::nodes_searched() { return nodes; }
 unsigned int Engine::best_move() { return pv_table[0][0]; }
+bool Engine::time_up() { return (std::chrono::steady_clock::now() - search_start_time) > time_limit; }
 int Engine::iterative_search(board_state &board, int depth)
 {
+    search_start_time = std::chrono::steady_clock::now();
     bool in_check = is_square_attacked(board.side == white ? least_significant_bit_index(board.bitboards[K]) : least_significant_bit_index(board.bitboards[k]), board);
 
     int evaluation;
@@ -58,6 +62,7 @@ int Engine::iterative_search(board_state &board, int depth)
             cout << "Depth: " << iterative_depth;
             cout << " Evaluation: " << evaluation << " cp";
             cout << " Nodes: " << nodes_searched();
+            cout << " Time: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - search_start_time);
             cout << " Principal variation: ";
             print_principal_variation();
 
@@ -66,6 +71,9 @@ int Engine::iterative_search(board_state &board, int depth)
             middle = evaluation;
             break;
         }
+
+        if (time_up()) break;
+
     }
     return evaluation;
 }
@@ -80,6 +88,7 @@ void Engine::print_principal_variation()
 
 int Engine::negamax(board_state &board, int alpha, int beta, int depth, int depth_from_root, int total_extension, bool in_check, bool allow_pruning)
 {
+    if (time_up()) return 0;
     nodes++;
     pv_length[depth_from_root] = depth_from_root;
 
@@ -118,6 +127,7 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
             board.side ^= 1;
 
             int evaluation = -negamax(board, -beta, -beta + 1, depth - 3, depth_from_root + 1, total_extension, false, false);
+            if (time_up()) return 0;
 
             board.enpassant = en_passant_square;
             board.side ^= 1;
@@ -127,6 +137,7 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
     }
 
     bool found_pv_node = false;
+    int node_type = upperbound;
     array<unsigned int, max_moves> move_list;
     span<unsigned int> moves = generate_moves(board, move_list, false);
     sort_moves(moves, !not_pv, depth_from_root);
@@ -142,26 +153,33 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
 
         // principal variation search
         int evaluation;
+        int used_depth = depth;
         if (found_pv_node)
         {
             int reduction = late_move_reduction(move, depth, i, extension);
             if (reduction > 0)
                 evaluation = -negamax(next_state, -alpha - 1, -alpha, depth - 1 + extension - reduction, depth_from_root + 1, move_total_extension, move_in_check, true);
+                if (time_up()) return 0;
             else
                 evaluation = alpha + 1;
 
             if (evaluation > alpha)
             {
                 evaluation = -negamax(next_state, -alpha - 1, -alpha, depth - 1 + extension, depth_from_root + 1, move_total_extension, move_in_check, true);
+                if (time_up()) return 0;
                 if (evaluation > alpha && evaluation < beta)
                     evaluation = -negamax(next_state, -beta, -alpha, depth - 1 + extension, depth_from_root + 1, move_total_extension, move_in_check, true);
+                    if (time_up()) return 0;
             }
         }
         else
             evaluation = -negamax(next_state, -beta, -alpha, depth - 1 + extension, depth_from_root + 1, move_total_extension, move_in_check, true);
+            if (time_up()) return 0;
 
         if (evaluation >= beta)
         {
+            add_move_to_table(board.zobrist_hash, move, depth, lowerbound, evaluation);
+
             // store killer moves
             killer_moves[1][depth_from_root] = killer_moves[0][depth_from_root];
             killer_moves[0][depth_from_root] = move;
@@ -171,6 +189,7 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
         if (evaluation > alpha)
         {
             found_pv_node = true;
+            node_type = exact;
 
             // store history heuristic
             if (move_capture(move) == no_piece)
@@ -196,15 +215,25 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
             return -check_mate_score + depth_from_root;
         return 0;  // stalemate
     }
+
+    unsigned int best_move = pv_table[depth_from_root][depth_from_root];
+    add_move_to_table(board.zobrist_hash, best_move, depth, node_type, alpha);
+
     return alpha;
 }
 
 int Engine::quiescence_search(board_state &board, int alpha, int beta)
 {
+    if (time_up()) return 0;
     nodes++;
     int evaluation = evaluate(board);
     if(evaluation >= beta)
         return beta;
+
+    int margin = delta_cutoff;  // margin = queen
+    if ( is_promoting(board) ) margin += material_score[4] - material_score[0];  // margin = 2 * queen - pawn
+    if ( evaluation < alpha - margin ) return alpha;
+    
     if(alpha < evaluation)
         alpha = evaluation;
 
@@ -216,6 +245,7 @@ int Engine::quiescence_search(board_state &board, int alpha, int beta)
         unsigned int move = moves[i];
         board_state next_state = make_move(board, move);
         int evaluation = -quiescence_search(next_state, -beta, -alpha);
+        if (time_up()) return 0;
 
         if (evaluation >= beta)
         {

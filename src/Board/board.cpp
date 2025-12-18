@@ -167,6 +167,14 @@ namespace board
         return no_piece;
     }
 
+    bool is_promoting(board_state &board)
+    {
+        U64 mask = board.side == white ? 0xFF00 : 0x00FF000000000000;
+        U64 pawns = board.side == white ? board.bitboards[P] : board.bitboards[p];
+        U64 promoting_pawns = mask & pawns;
+        return promoting_pawns != 0;
+    }
+
     unsigned int encode_move(int source, int target, int piece, int promotion, int capture, bool double_push, bool enpassant, bool castle)
     {
         unsigned int move = source | (target << 6) | (piece << 12) | (promotion << 16) | (capture << 20) | (double_push << 24) | (enpassant << 25) | (castle << 26);

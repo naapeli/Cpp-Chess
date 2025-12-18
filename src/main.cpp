@@ -28,6 +28,7 @@ using board::board_state;
 using board::encode_move;
 using board::make_move;
 using board::move_to_string;
+using board::is_promoting;
 using board_utils::parse_fen;
 using board_utils::print_board;
 using bitboard_utils::print_bitboard;
@@ -44,28 +45,38 @@ int main()
     string perft_position_6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
 
     init_all();
-    board_state state = parse_fen("2kr1bnr/pppqpppp/2n1b3/3p4/4P3/5N2/PPPPBPPP/RNBQR1K1 w - - 0 1");
+    // board_state state = parse_fen("2kr1bnr/pppqpppp/2n1b3/3p4/4P3/5N2/PPPPBPPP/RNBQR1K1 w - - 0 1");
     // state = make_move(state, encode_move(b1, c3, N, no_promotion, no_piece, 0, 0, 0));
-    print_board(state);
+    // print_board(state);
 
-    board_state state2 = parse_fen(start_position);
-    state2 = make_move(state2, encode_move(e2, e4, P, no_promotion, no_piece, 1, 0, 0));
-    state2 = make_move(state2, encode_move(d7, d5, p, no_promotion, no_piece, 1, 0, 0));
-    state2 = make_move(state2, encode_move(g1, f3, N, no_promotion, no_piece, 0, 0, 0));
-    state2 = make_move(state2, encode_move(b8, c6, n, no_promotion, no_piece, 0, 0, 0));
-    state2 = make_move(state2, encode_move(f1, e2, B, no_promotion, no_piece, 0, 0, 0));
-    state2 = make_move(state2, encode_move(c8, e6, b, no_promotion, no_piece, 0, 0, 0));
-    state2 = make_move(state2, encode_move(e1, g1, K, no_promotion, no_piece, 0, 0, 1));
-    state2 = make_move(state2, encode_move(d8, d7, q, no_promotion, no_piece, 0, 0, 0));
-    state2 = make_move(state2, encode_move(f1, e1, R, no_promotion, no_piece, 0, 0, 0));
-    state2 = make_move(state2, encode_move(e8, c8, k, no_promotion, no_piece, 0, 0, 1));
-    print_board(state2);
+    // board_state state2 = parse_fen(start_position);
+    // state2 = make_move(state2, encode_move(e2, e4, P, no_promotion, no_piece, 1, 0, 0));
+    // state2 = make_move(state2, encode_move(d7, d5, p, no_promotion, no_piece, 1, 0, 0));
+    // state2 = make_move(state2, encode_move(g1, f3, N, no_promotion, no_piece, 0, 0, 0));
+    // state2 = make_move(state2, encode_move(b8, c6, n, no_promotion, no_piece, 0, 0, 0));
+    // state2 = make_move(state2, encode_move(f1, e2, B, no_promotion, no_piece, 0, 0, 0));
+    // state2 = make_move(state2, encode_move(c8, e6, b, no_promotion, no_piece, 0, 0, 0));
+    // state2 = make_move(state2, encode_move(e1, g1, K, no_promotion, no_piece, 0, 0, 1));
+    // state2 = make_move(state2, encode_move(d8, d7, q, no_promotion, no_piece, 0, 0, 0));
+    // state2 = make_move(state2, encode_move(f1, e1, R, no_promotion, no_piece, 0, 0, 0));
+    // state2 = make_move(state2, encode_move(e8, c8, k, no_promotion, no_piece, 0, 0, 1));
+    // print_board(state2);
 
     // array<unsigned int, max_moves> move_list;
     // span<unsigned int> moves = generate_moves(state, move_list, false);
 
     // Engine engine;
     // engine.iterative_search(state, 6);
+
+    // board_state state = parse_fen("r5rk/2p1Nppp/3p3P/pp2p1P1/4P3/2qnPQK1/8/R6R w - - 1 0");
+    // board_state state = parse_fen("r1bk3r/pppq1ppp/5n2/4N1N1/2Bp4/Bn6/P4PPP/4R1K1 w - - 1 0");
+    // board_state state = parse_fen("r2n1rk1/1ppb2pp/1p1p4/3Ppq1n/2B3P1/2P4P/PP1N1P1K/R2Q1RN1 b - - 0 1");
+    // state = make_move(state, encode_move(f5, f2, q, no_promotion, P, 1, 0, 0));
+    board_state state = parse_fen("r1bnk2r/pppp1ppp/1b4q1/4P3/2B1N3/Q1Pp1N2/P4PPP/R3R1K1 w - - 1 0");
+    print_board(state);
+    Engine engine;
+    engine.iterative_search(state, 5);
+    cout << move_to_string(engine.best_move()) << endl;
 
     return 0;
 }

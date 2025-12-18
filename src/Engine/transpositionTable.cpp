@@ -49,7 +49,7 @@ namespace transposition_table
     {
         int index = zobrist_hash % array_size;
         // if applicable, store in both the shallow and deep transposition tables
-        transposition_table::transposition_table_entry shallow_entry = shallow_tt_table[index];
+        transposition_table_entry shallow_entry = shallow_tt_table[index];
         shallow_entry.zobrist_hash = zobrist_hash;
         shallow_entry.best_move = move;
         shallow_entry.depth = depth;
@@ -57,7 +57,7 @@ namespace transposition_table
         shallow_entry.evaluation = evaluation;
         if (deep_tt_table[index].depth <= depth)
         {
-            transposition_table::transposition_table_entry deep_entry = deep_tt_table[index];
+            transposition_table_entry deep_entry = deep_tt_table[index];
             deep_entry.zobrist_hash = zobrist_hash;
             deep_entry.best_move = move;
             deep_entry.depth = depth;
@@ -69,7 +69,7 @@ namespace transposition_table
     int get_evaluation_from_table(U64 zobrist_hash, int depth, int alpha, int beta)
     {
         int index = zobrist_hash % array_size;
-        transposition_table::transposition_table_entry entry = deep_tt_table[index];
+        transposition_table_entry entry = deep_tt_table[index];
         if (entry.zobrist_hash == zobrist_hash)
         {
             if (entry.depth >= depth)

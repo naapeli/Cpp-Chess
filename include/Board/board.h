@@ -21,6 +21,7 @@ namespace board
     board_state make_move(board_state board, unsigned int move);
 
     int find_captured_piece(board_state &board, int square);
+    bool is_promoting(board_state &board);
     unsigned int encode_move(int source, int target, int piece, int promotion, int capture, bool double_push, bool enpassant, bool castle);
     int move_source(unsigned int  move);
     int move_target(unsigned int  move);
