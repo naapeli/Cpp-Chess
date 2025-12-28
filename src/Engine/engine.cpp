@@ -26,8 +26,10 @@ using std::array, std::vector, std::span;
 int Engine::nodes_searched() { return nodes; }
 unsigned int Engine::best_move() { return pv_table[0][0]; }
 bool Engine::time_up() { return (std::chrono::steady_clock::now() - search_start_time) > time_limit; }
-int Engine::iterative_search(board_state &board, int depth)
+int Engine::iterative_search(board_state &board, int time_milli_seconds)
 {
+    time_limit = std::chrono::milliseconds{time_milli_seconds};
+    int depth = 10000;
     search_start_time = std::chrono::steady_clock::now();
     bool in_check = is_square_attacked(board.side == white ? least_significant_bit_index(board.bitboards[K]) : least_significant_bit_index(board.bitboards[k]), board);
 
@@ -45,6 +47,7 @@ int Engine::iterative_search(board_state &board, int depth)
             alpha = middle - lower_window;
             beta = middle + upper_window;
             evaluation = negamax(board, alpha, beta, iterative_depth, 0, 0, in_check, false);
+            if (time_up()) break;
 
             if (evaluation >= beta)
             {
@@ -88,7 +91,7 @@ void Engine::print_principal_variation()
 
 int Engine::negamax(board_state &board, int alpha, int beta, int depth, int depth_from_root, int total_extension, bool in_check, bool allow_pruning)
 {
-    if (time_up()) return 0;
+    if (time_up()) return invalid_evaluation;
     nodes++;
     pv_length[depth_from_root] = depth_from_root;
 
@@ -127,11 +130,11 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
             board.side ^= 1;
 
             int evaluation = -negamax(board, -beta, -beta + 1, depth - 3, depth_from_root + 1, total_extension, false, false);
-            if (time_up()) return 0;
 
             board.enpassant = en_passant_square;
             board.side ^= 1;
 
+            if (time_up()) return invalid_evaluation;
             if (evaluation >= beta) return beta;
         }
     }
@@ -159,22 +162,22 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
             int reduction = late_move_reduction(move, depth, i, extension);
             if (reduction > 0)
                 evaluation = -negamax(next_state, -alpha - 1, -alpha, depth - 1 + extension - reduction, depth_from_root + 1, move_total_extension, move_in_check, true);
-                if (time_up()) return 0;
+                if (time_up()) return invalid_evaluation;
             else
                 evaluation = alpha + 1;
 
             if (evaluation > alpha)
             {
                 evaluation = -negamax(next_state, -alpha - 1, -alpha, depth - 1 + extension, depth_from_root + 1, move_total_extension, move_in_check, true);
-                if (time_up()) return 0;
+                if (time_up()) return invalid_evaluation;
                 if (evaluation > alpha && evaluation < beta)
                     evaluation = -negamax(next_state, -beta, -alpha, depth - 1 + extension, depth_from_root + 1, move_total_extension, move_in_check, true);
-                    if (time_up()) return 0;
+                    if (time_up()) return invalid_evaluation;
             }
         }
         else
             evaluation = -negamax(next_state, -beta, -alpha, depth - 1 + extension, depth_from_root + 1, move_total_extension, move_in_check, true);
-            if (time_up()) return 0;
+            if (time_up()) return invalid_evaluation;
 
         if (evaluation >= beta)
         {
@@ -224,7 +227,7 @@ int Engine::negamax(board_state &board, int alpha, int beta, int depth, int dept
 
 int Engine::quiescence_search(board_state &board, int alpha, int beta)
 {
-    if (time_up()) return 0;
+    if (time_up()) return invalid_evaluation;
     nodes++;
     int evaluation = evaluate(board);
     if(evaluation >= beta)
@@ -245,7 +248,7 @@ int Engine::quiescence_search(board_state &board, int alpha, int beta)
         unsigned int move = moves[i];
         board_state next_state = make_move(board, move);
         int evaluation = -quiescence_search(next_state, -beta, -alpha);
-        if (time_up()) return 0;
+        if (time_up()) return invalid_evaluation;
 
         if (evaluation >= beta)
         {

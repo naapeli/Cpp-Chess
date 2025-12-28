@@ -19,7 +19,7 @@ class Engine {
     public:
         int nodes_searched();
         unsigned int best_move();
-        int iterative_search(board_state &board, int depth);
+        int iterative_search(board_state &board, int time_milli_seconds);
         void print_principal_variation();
 
     private:
