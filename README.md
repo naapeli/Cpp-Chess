@@ -1,4 +1,4 @@
-A chess engine made using C++. Play against the engine [https://naapeli.github.io/Cpp-Chess/](here).
+A chess engine made using C++. Play against the engine [here](https://naapeli.github.io/Cpp-Chess/).
 
 First generate the necessary files with:
 ```
