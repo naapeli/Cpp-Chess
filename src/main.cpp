@@ -1,7 +1,4 @@
 #include <iostream>
-#include <string>
-#include <array>
-#include <span>
 
 #include "utils.h"
 #include "Board/board.h"
@@ -9,9 +6,6 @@
 #include "MoveGenerator/MoveGenerator.h"
 #include "Engine/engine.h"
 
-using std::string;
-using std::array;
-using std::span;
 using std::cout;
 using std::endl;
 
@@ -72,11 +66,13 @@ int main()
     // board_state state = parse_fen("r1bk3r/pppq1ppp/5n2/4N1N1/2Bp4/Bn6/P4PPP/4R1K1 w - - 1 0");
     // board_state state = parse_fen("r2n1rk1/1ppb2pp/1p1p4/3Ppq1n/2B3P1/2P4P/PP1N1P1K/R2Q1RN1 b - - 0 1");
     // state = make_move(state, encode_move(f5, f2, q, no_promotion, P, 1, 0, 0));
-    board_state state = parse_fen("r1bnk2r/pppp1ppp/1b4q1/4P3/2B1N3/Q1Pp1N2/P4PPP/R3R1K1 w - - 1 0");
+    // board_state state = parse_fen("r1bnk2r/pppp1ppp/1b4q1/4P3/2B1N3/Q1Pp1N2/P4PPP/R3R1K1 w - - 1 0");
+    // print_board(state);
+    // Engine engine;
+    // engine.iterative_search(state, 5000);
+    // cout << move_to_string(engine.best_move()) << endl;
+    board_state state = parse_fen(start_position);
     print_board(state);
-    Engine engine;
-    engine.iterative_search(state, 5);
-    cout << move_to_string(engine.best_move()) << endl;
 
     return 0;
 }

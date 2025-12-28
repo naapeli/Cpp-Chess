@@ -1,4 +1,8 @@
 #include <iostream>
+#include <string>
+#include <algorithm>
+#include <span>
+
 #include "utils.h"
 #include "Board/board.h"
 #include "MoveGenerator/MoveGenerator.h"
@@ -12,6 +16,7 @@ using namespace zobrist;
 using std::cout;
 using std::endl;
 using board::board_state;
+using std::string;
 
 
 namespace board
@@ -167,6 +172,18 @@ namespace board
         return no_piece;
     }
 
+    int find_piece(board_state &board, int square)
+    {
+        for (int piece = P; piece <= k; piece++)
+        {
+            if (get_bit(board.bitboards[piece], square))
+            {
+                return piece;
+            }
+        }
+        return no_piece;
+    }
+
     bool is_promoting(board_state &board)
     {
         U64 mask = board.side == white ? 0xFF00 : 0x00FF000000000000;
@@ -179,6 +196,22 @@ namespace board
     {
         unsigned int move = source | (target << 6) | (piece << 12) | (promotion << 16) | (capture << 20) | (double_push << 24) | (enpassant << 25) | (castle << 26);
         return move;
+    }
+
+    unsigned int encode_move(board_state &board, string move)
+    {
+        int source = board_utils::string_to_square(move.substr(0, 2));
+        int target = board_utils::string_to_square(move.substr(2, 2));
+        int piece = find_piece(board, source);
+        int captured_piece = find_piece(board, target);
+        int promotion = move.size() == 5 ? string_to_promotion.at(move[4]) : no_promotion;
+        
+        bool double_push = board.side == white ? (source - target == 16) && (piece == P) : (target - source == 16) && piece == p;
+        bool enpassant = (piece == P || piece == p) && target == board.enpassant;
+        bool castle = (piece == K && (move == "e1g1" || move == "e1g1")) || (piece == k && (move == "e8g8" || move == "e8g8"));
+
+        unsigned int encoded_move = encode_move(source, target, piece, promotion, captured_piece, double_push, enpassant, castle);
+        return encoded_move;
     }
     
     int move_source(unsigned int move)
@@ -224,6 +257,14 @@ namespace board
     string move_to_string(unsigned int move)
     {
         return square_to_coordinates[move_source(move)] + square_to_coordinates[move_target(move)] + promotion_to_string[move_promotion(move)];
+    }
+
+    bool is_promotion(int piece, int target)
+    {
+        U64 mask = piece <= K ? 0xFF : 0xFF000000000000;
+        U64 target_board = 0;
+        set_bit(target_board, target);
+        return (mask & target_board) == 0;
     }
 }
 
@@ -353,5 +394,23 @@ namespace board_utils
         cout << "    Enpassant:     " << (state.enpassant != no_square ? square_to_coordinates[state.enpassant] : "-") << endl;
         cout << "    Castling:      " << ((state.castle & wk) ? 'K' : '-') << ((state.castle & wq) ? 'Q' : '-') << ((state.castle & bk) ? 'k' : '-') << ((state.castle & bq) ? 'q' : '-') << endl;
         cout << "    Hash key:      " << state.zobrist_hash << endl << endl << endl;
+    }
+
+    void print_move_list(std::span<unsigned int> move_list)
+    {
+        for (auto& move : move_list)
+        {
+            std::cout << board::move_to_string(move) << std::endl;
+        }
+    }
+
+    int string_to_square(const string& square) {
+        if (square.length() != 2) return no_square;
+        char fileChar = square[0];
+        char rankChar = square[1];
+        int col = fileChar - 'a';
+        int row = '8' - rankChar;
+        if (col < 0 || col > 7 || row < 0 || row > 7) return no_square;
+        return (row * 8) + col;
     }
 }
