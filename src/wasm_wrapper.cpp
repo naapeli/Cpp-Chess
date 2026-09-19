@@ -49,17 +49,15 @@ extern "C" {
 
         array<unsigned int, 218> move_list;
         span<unsigned int> moves = generate_moves(wrapper_state::state, move_list, false);
-        bool legal_move = std::ranges::contains(moves, encoded_move);  // this way is in C++23 I believe but not in C++20
-        // bool legal_move = std::ranges::find(moves, encoded_move) != moves.end();
+        bool legal_move = std::ranges::contains(moves, encoded_move);
 
         if (legal_move)
         {
+            // increment repetition table
             wrapper_state::state = make_move(wrapper_state::state, encoded_move);
+            wrapper_state::engine.increment_repetition(wrapper_state::state.zobrist_hash);
             return 1;
         }
-        // std::cout << cppmove << std::endl << std::endl;
-        // board_utils::print_move_list(moves);
-
         return 0;
     }
 
@@ -67,6 +65,6 @@ extern "C" {
     void new_state(const char* fen) {
         string cppfen = fen;
         wrapper_state::state = parse_fen(cppfen);
-        // board_utils::print_board(wrapper_state::state);
+        wrapper_state::engine.clear_repetition_table();
     }
 }

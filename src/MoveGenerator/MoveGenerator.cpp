@@ -508,8 +508,6 @@ namespace move_generator
             while (attacks_board)
             {
                 int target = least_significant_bit_index(attacks_board);
-                // if (get_bit(board.occupancies[enemy_color], target))
-                //     cout << piece_to_string[find_captured_piece(board, target)] << endl;
                 if (get_bit(board.occupancies[enemy_color], target))
                     // capture
                     moves[move_index++] = encode_move(source, target, piece, no_promotion, find_captured_piece(board, target), 0, 0, 0);

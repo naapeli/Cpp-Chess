@@ -57,6 +57,7 @@ namespace constants
     const int check_mate_score = 50000;
     const int alpha_beta_bounds_start = 2 * check_mate_score;
     const int invalid_evaluation = 2 * check_mate_score + 1;
+    const unsigned int invalid_move = 0;
 }
 
 namespace random_numbers

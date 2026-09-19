@@ -208,7 +208,7 @@ namespace board
         
         bool double_push = board.side == white ? (source - target == 16) && (piece == P) : (target - source == 16) && piece == p;
         bool enpassant = (piece == P || piece == p) && target == board.enpassant;
-        bool castle = (piece == K && (move == "e1g1" || move == "e1g1")) || (piece == k && (move == "e8g8" || move == "e8g8"));
+        bool castle = (piece == K && (move == "e1g1" || move == "e1c1")) || (piece == k && (move == "e8g8" || move == "e8c8"));
 
         unsigned int encoded_move = encode_move(source, target, piece, promotion, captured_piece, double_push, enpassant, castle);
         return encoded_move;

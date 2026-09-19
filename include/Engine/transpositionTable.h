@@ -23,7 +23,7 @@ namespace transposition_table
     struct transposition_table_entry
     {
         U64 zobrist_hash;
-        U64 best_move;
+        unsigned int best_move;
         int depth;
         int node_type;
         int evaluation;
@@ -31,11 +31,12 @@ namespace transposition_table
     constexpr size_t max_size_mb = 64;
     constexpr size_t bytes_per_mb = 1024 * 1024;
     constexpr size_t array_size = (max_size_mb * bytes_per_mb) / sizeof(transposition_table_entry);
-    extern array<transposition_table_entry, array_size> shallow_tt_table;
-    extern array<transposition_table_entry, array_size> deep_tt_table;
+    extern array<transposition_table_entry, array_size> tt_table;
 
-    void add_move_to_table(U64 zobrist_hash, U64 move, int depth, int node_type, int evaluation);
+    void add_move_to_table(U64 zobrist_hash, unsigned int move, int depth, int node_type, int evaluation);
     int get_evaluation_from_table(U64 zobrist_hash, int depth, int alpha, int beta);
+    unsigned int get_best_move_from_table(U64 zobrist_hash, int depth);
+    transposition_table_entry& get_entry_from_table(U64 zobrist_hash);
 }
 
 

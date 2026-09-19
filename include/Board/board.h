@@ -20,6 +20,7 @@ namespace board
         // TODO: half and full move counters
     };
     board_state make_move(board_state board, unsigned int move);
+    // void take_back(board_state board, unsigned int move);
 
     int find_captured_piece(board_state &board, int square);
     int find_piece(board_state &board, int square);

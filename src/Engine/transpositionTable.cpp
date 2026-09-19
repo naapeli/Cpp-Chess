@@ -1,5 +1,7 @@
 #include "Engine/transpositionTable.h"
 #include "utils.h"
+
+#include <iostream>
 #include <array>
 
 using namespace constants;
@@ -42,55 +44,53 @@ namespace zobrist
 
 namespace transposition_table
 {
-    array<transposition_table_entry, array_size> deep_tt_table;
-    array<transposition_table_entry, array_size> shallow_tt_table;
+    array<transposition_table_entry, array_size> tt_table;
 
-    void add_move_to_table(U64 zobrist_hash, U64 move, int depth, int node_type, int evaluation)
+    void add_move_to_table(U64 zobrist_hash, unsigned int move, int depth, int node_type, int evaluation)
     {
         int index = zobrist_hash % array_size;
-        // if applicable, store in both the shallow and deep transposition tables
-        transposition_table_entry shallow_entry = shallow_tt_table[index];
-        shallow_entry.zobrist_hash = zobrist_hash;
-        shallow_entry.best_move = move;
-        shallow_entry.depth = depth;
-        shallow_entry.node_type = node_type;
-        shallow_entry.evaluation = evaluation;
-        if (deep_tt_table[index].depth <= depth)
-        {
-            transposition_table_entry deep_entry = deep_tt_table[index];
-            deep_entry.zobrist_hash = zobrist_hash;
-            deep_entry.best_move = move;
-            deep_entry.depth = depth;
-            deep_entry.node_type = node_type;
-            deep_entry.evaluation = evaluation;
-        }
+        transposition_table_entry& old_entry = tt_table[index];
+        if (old_entry.zobrist_hash == zobrist_hash && old_entry.depth >= depth) return;  // if we have stored a deeper evaluation, keep that, but otherwise store the entry
+        
+        transposition_table_entry& deep_entry = tt_table[index];
+        deep_entry.zobrist_hash = zobrist_hash;
+        deep_entry.best_move = move;
+        deep_entry.depth = depth;
+        deep_entry.node_type = node_type;
+        deep_entry.evaluation = evaluation;
     }
 
-    int get_evaluation_from_table(U64 zobrist_hash, int depth, int alpha, int beta)
+    // int get_evaluation_from_table(U64 zobrist_hash, int depth, int alpha, int beta)
+    // {
+    //     int index = zobrist_hash % array_size;
+    //     transposition_table_entry& entry = tt_table[index];
+    //     if (entry.zobrist_hash == zobrist_hash)
+    //     {
+    //         if (entry.depth >= depth)
+    //         {
+    //             if (entry.node_type == exact) return entry.evaluation;
+    //             if (entry.node_type == lowerbound && entry.evaluation <= alpha) return alpha;
+    //             if (entry.node_type == upperbound && entry.evaluation >= beta) return beta;
+    //         }
+    //     }
+
+    //     return invalid_evaluation;
+    // }
+
+    // unsigned int get_best_move_from_table(U64 zobrist_hash, int depth)
+    // {
+    //     int index = zobrist_hash % array_size;
+    //     transposition_table_entry& entry = tt_table[index];
+    //     if (entry.zobrist_hash == zobrist_hash && entry.depth >= depth)
+    //     {
+    //         return entry.best_move;
+    //     }
+
+    //     return invalid_move;
+    // }
+    transposition_table_entry& get_entry_from_table(U64 zobrist_hash)
     {
         int index = zobrist_hash % array_size;
-        transposition_table_entry entry = deep_tt_table[index];
-        if (entry.zobrist_hash == zobrist_hash)
-        {
-            if (entry.depth >= depth)
-            {
-                if (entry.node_type == exact) return entry.evaluation;
-                if (entry.node_type == lowerbound && entry.evaluation <= alpha) return alpha;
-                if (entry.node_type == upperbound && entry.evaluation >= beta) return beta;
-            }
-        }
-
-        entry = shallow_tt_table[index];
-        if (entry.zobrist_hash == zobrist_hash)
-        {
-            if (entry.depth >= depth)
-            {
-                if (entry.node_type == exact) return entry.evaluation;
-                if (entry.node_type == lowerbound && entry.evaluation <= alpha) return alpha;
-                if (entry.node_type == upperbound && entry.evaluation >= beta) return beta;
-            }
-        }
-
-        return invalid_evaluation;
+        return tt_table[index];
     }
 }
