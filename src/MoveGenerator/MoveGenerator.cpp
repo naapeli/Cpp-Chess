@@ -6,10 +6,11 @@
 #include <iostream>
 #include <array>
 #include <span>
-#include <format>
-#include <chrono>
 
-using std::format;
+#include <chrono>
+#include <stdexcept>
+
+
 using std::cout;
 using std::endl;
 using std::span;
@@ -59,19 +60,6 @@ namespace move_generator
         return false;
     }
 
-    bool in_check_after_en_passant(board_state &board, int source, int enemy_pawn_location)
-    {
-        U64 enemy_orthogonal_sliders = board.side == white ? (board.bitboards[q] | board.bitboards[r]) : (board.bitboards[Q] | board.bitboards[R]);
-        if (enemy_orthogonal_sliders)
-        {
-            U64 blockers = board.occupancies[both] ^ ((1ULL << source) | (1ULL << enemy_pawn_location) | (1ULL << board.enpassant));
-            int king_location = least_significant_bit_index((board.side == white ? board.bitboards[K] : board.bitboards[k]));
-            U64 attacks_board = rook_attacks(king_location, blockers);
-            return (attacks_board & enemy_orthogonal_sliders) != 0;
-        }
-        return false;
-    }
-
     void print_attacked(board_state &board)
     {
         for (int rank = 0; rank < 8; rank++)
@@ -92,7 +80,7 @@ namespace move_generator
     void print_move_list(span<unsigned int> moves)
     {
         cout << "Move      Piece      Capture      En passant      Castle" << endl;
-        for (int i = 0; i < moves.size(); i++)
+        for (size_t i = 0; i < moves.size(); i++)
         {
             unsigned int move = moves[i];
             cout << square_to_coordinates[move_source(move)] << square_to_coordinates[move_target(move)];
@@ -104,8 +92,9 @@ namespace move_generator
         cout << endl << "Number of moves:        " << moves.size() << endl << endl;
     }
 
-    int perft(board_state board, int depth)
+    U64 perft(board_state board, int depth)
     {
+        if (depth < 0) throw std::invalid_argument("perft depth must be nonnegative");
         array<unsigned int, max_moves> move_list;
         span<unsigned int> moves = generate_moves(board, move_list, false);
         if (depth == 0)
@@ -116,8 +105,8 @@ namespace move_generator
         {
             return moves.size();
         }
-        int n_moves = 0;
-        for (int i = 0; i < moves.size(); i++)
+        U64 n_moves = 0;
+        for (size_t i = 0; i < moves.size(); i++)
         {
             unsigned int move = moves[i];
             board_state new_board = make_move(board, move);
@@ -131,12 +120,12 @@ namespace move_generator
         array<unsigned int, max_moves> move_list;
         span<unsigned int> moves = generate_moves(board, move_list, false);
         cout << "Move     number of moves from position" << endl;
-        int n_moves = 0;
-        for (int i = 0; i < moves.size(); i++)
+        U64 n_moves = 0;
+        for (size_t i = 0; i < moves.size(); i++)
         {
             int move = moves[i];
             board_state new_board = make_move(board, move);
-            int n_submoves = perft(new_board, depth - 1);
+            U64 n_submoves = perft(new_board, depth - 1);
             n_moves += n_submoves;
             cout << move_to_string(move) << "    " << n_submoves << endl;
         }
@@ -306,32 +295,25 @@ namespace move_generator
             pop_bit(capture_promotions_2, target);
         }
 
-        // en passant
-        if (board.enpassant != no_square)
-        {
-            U64 capture_pawn_location = board.side == white ? board.enpassant + 8 : board.enpassant - 8;
-            U64 capture_board = 1ULL << capture_pawn_location;
-            if (capture_board & info.check_rays)
-            {
-                int enemy = board.side == white ? black : white;
-                U64 pawns_able_to_en_passant = pawn_attacks(board.enpassant, enemy) & board.bitboards[piece];
-                while (pawns_able_to_en_passant)
-                {
-                    int source = least_significant_bit_index(pawns_able_to_en_passant);
-                    if (!get_bit(info.pin_rays, source) || (align_mask[source][king_location] == align_mask[board.enpassant][king_location]))
-                    {
-                        if (!in_check_after_en_passant(board, source, capture_pawn_location))
-                        {
-                            moves[move_index++] = encode_move(source, board.enpassant, piece, no_promotion, find_captured_piece(board, capture_pawn_location), 0, 1, 0);
-                        }
-                    }
-                    pop_bit(pawns_able_to_en_passant, source);
+        // Test the complete resulting position: EP can remove a checking pawn,
+        // block a diagonal check, or uncover a rook/bishop attack on our king.
+        if (board.enpassant != no_square) {
+            const int captured = board.enpassant + (board.side == white ? 8 : -8);
+            if (get_bit(board.bitboards[board.side == white ? p : P], captured)) {
+                U64 candidates = pawn_attacks(board.enpassant, enemy) & board.bitboards[piece];
+                while (candidates) {
+                    int source = least_significant_bit_index(candidates);
+                    auto move = encode_move(source, board.enpassant, piece, no_promotion, board.side == white ? p : P, 0, 1, 0);
+                    auto next = make_move(board, move);
+                    next.side = board.side;
+                    if (!is_square_attacked(king_location, next)) moves[move_index++] = move;
+                    pop_bit(candidates, source);
                 }
             }
         }
     }
 
-    void _generate_king_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index)
+    void _generate_king_moves(board_state &board, king_info&, bool no_quiet_moves, span<unsigned int> moves, int &move_index)
     {
         int piece = (board.side == white) ? K : k;
         int rook = (board.side == white) ? R : r;
@@ -390,7 +372,6 @@ namespace move_generator
         }
 
         // normal king moves
-        U64 bitboard = king_bitboard;
         U64 attacks_board = king_attacks(king_location) & ~board.occupancies[board.side];
         if (no_quiet_moves)
             attacks_board &= board.occupancies[enemy_color];
@@ -535,7 +516,7 @@ namespace move_generator
         
         // check sliders for pins or checks
         array<array<int, 2>, 8> offsets = {{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
-        for (int i = 0; i < offsets.size(); i++)
+        for (size_t i = 0; i < offsets.size(); i++)
         {
             bool is_diagonal = i < 4;
             U64 possible_checkers;

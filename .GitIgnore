@@ -1,3 +1,11 @@
 /build_release/
 /build_debug/
 /.vscode/
+build/
+/build-*/
+/.venv/
+/.uv-cache/
+/tools/bin/
+/reports/
+__pycache__/
+.pytest_cache/

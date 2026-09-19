@@ -291,7 +291,7 @@ namespace piece_attacks
             file = king_location % 8;
             int k;
 
-            for (int i = 0; i < offsets.size(); i++)
+            for (size_t i = 0; i < offsets.size(); i++)
             {
                 k = 1;
                 _r = row + offsets[i][0];
@@ -326,6 +326,9 @@ namespace piece_attacks
 
     void init_all()
     {
+        static bool initialized = false;
+        if (initialized) return;
+        initialized = true;
         init_all_attacks();
         _init_align_masks();
         init_zobrist_keys();

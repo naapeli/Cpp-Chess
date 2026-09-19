@@ -2,6 +2,10 @@
 #include <string>
 #include <algorithm>
 #include <span>
+#include <sstream>
+#include <stdexcept>
+#include <cctype>
+#include <limits>
 
 #include "utils.h"
 #include "Board/board.h"
@@ -47,7 +51,17 @@ namespace board
         }
         if (piece == K) board.castle &= 0b0011;
         else if (piece == k) board.castle &= 0b1100;
+        if (move_capture(move) == R) {
+            if (target == h1) board.castle &= ~wk;
+            if (target == a1) board.castle &= ~wq;
+        } else if (move_capture(move) == r) {
+            if (target == h8) board.castle &= ~bk;
+            if (target == a8) board.castle &= ~bq;
+        }
         board.zobrist_hash ^= zobrist_castle[board.castle];
+        board.halfmove_clock = (piece == P || piece == p || move_capture(move) != no_piece)
+            ? 0 : board.halfmove_clock + 1;
+        if (board.side == black) ++board.fullmove_number;
 
         // set piece at new location considering possible promotion
         int promotion = move_promotion(move);
@@ -200,20 +214,20 @@ namespace board
 
     unsigned int encode_move(board_state &board, string move)
     {
-        int source = board_utils::string_to_square(move.substr(0, 2));
-        int target = board_utils::string_to_square(move.substr(2, 2));
-        int piece = find_piece(board, source);
-        int captured_piece = find_piece(board, target);
-        int promotion = move.size() == 5 ? string_to_promotion.at(move[4]) : no_promotion;
-        
-        bool double_push = board.side == white ? (source - target == 16) && (piece == P) : (target - source == 16) && piece == p;
-        bool enpassant = (piece == P || piece == p) && target == board.enpassant;
-        bool castle = (piece == K && (move == "e1g1" || move == "e1c1")) || (piece == k && (move == "e8g8" || move == "e8c8"));
-
-        unsigned int encoded_move = encode_move(source, target, piece, promotion, captured_piece, double_push, enpassant, castle);
-        return encoded_move;
+        std::transform(move.begin(), move.end(), move.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::array<unsigned int, max_moves> buffer;
+        for (auto legal : move_generator::generate_moves(board, buffer, false))
+            if (move_to_string(legal) == move) return legal;
+        return invalid_move;
     }
-    
+    board_state make_null_move(board_state position) {
+        if (position.enpassant != no_square) position.zobrist_hash ^= zobrist_enpassant[position.enpassant];
+        position.enpassant = no_square;
+        position.side = !position.side;
+        position.zobrist_hash ^= zobrist_side;
+        return position;
+    }
+
     int move_source(unsigned int move)
     {
         return move & 0b111111;
@@ -256,97 +270,96 @@ namespace board
 
     string move_to_string(unsigned int move)
     {
-        return square_to_coordinates[move_source(move)] + square_to_coordinates[move_target(move)] + promotion_to_string[move_promotion(move)];
+        if (move == invalid_move) return "0000";
+        string result = square_to_coordinates[move_source(move)] + square_to_coordinates[move_target(move)];
+        if (move_promotion(move) != no_promotion)
+            result += static_cast<char>(std::tolower(static_cast<unsigned char>(promotion_to_string[move_promotion(move)])));
+        return result;
     }
 
-    bool is_promotion(int piece, int target)
-    {
-        U64 mask = piece <= K ? 0xFF : 0xFF000000000000;
-        U64 target_board = 0;
-        set_bit(target_board, target);
-        return (mask & target_board) == 0;
+    bool is_promotion(int piece, int target) {
+        return (piece == P && target / 8 == 0) || (piece == p && target / 8 == 7);
     }
+
 }
 
 namespace board_utils
 {
     board_state parse_fen(string fen)
     {
-        int fen_index = 0;
-        board_state state = board_state{};
-        
-        // update bitboards
-        int square = 0;
-        while (square < 64)
-        {
-            if ((fen[fen_index] >= 'a' && fen[fen_index] <= 'z') || (fen[fen_index] >= 'A' && fen[fen_index] <= 'Z'))
-            {
-                char piece_char = fen[fen_index];
-                int piece = string_to_piece.at(piece_char);
-                set_bit(state.bitboards[piece], square);
-                square++;
+        std::istringstream input(fen);
+        string placement, side, castling, ep, half, full, extra;
+        if (!(input >> placement >> side >> castling >> ep)) throw std::invalid_argument("FEN requires at least four fields");
+        board_state state{};
+        state.enpassant = no_square;
+        int rank = 0, file = 0;
+        for (char c : placement) {
+            if (c == '/') {
+                if (file != 8 || rank >= 7) throw std::invalid_argument("Invalid FEN rank");
+                ++rank; file = 0;
+            } else if (c >= '1' && c <= '8') {
+                file += c - '0';
+                if (file > 8) throw std::invalid_argument("Invalid FEN rank width");
+            } else {
+                auto it = string_to_piece.find(c);
+                if (it == string_to_piece.end() || file >= 8) throw std::invalid_argument("Invalid FEN piece");
+                set_bit(state.bitboards[it->second], rank * 8 + file++);
             }
-            else if (fen[fen_index] >= '0' && fen[fen_index] <= '9')
-            {
-                int offset = fen[fen_index] - '0';
-                int current_piece = -1;
-                for (int piece = P; piece <= k; piece++)
-                {
-                    if (get_bit(state.bitboards[piece], square))
-                        current_piece = piece;
-                }
-
-                square += offset;
-            }
-            fen_index++;
         }
-        fen_index++;
-
-        // update side to move
-        (fen[fen_index] == 'w') ? (state.side = white) : (state.side = black);
-        fen_index += 2;
-
-        // update castling rights
-        while (fen[fen_index] != ' ')
-        {
-            switch (fen[fen_index])
-            {
-                case 'K': state.castle |= wk; break;
-                case 'Q': state.castle |= wq; break;
-                case 'k': state.castle |= bk; break;
-                case 'q': state.castle |= bq; break;
-                case '-': break;
-            }
-            fen_index++;
+        if (rank != 7 || file != 8 || (side != "w" && side != "b")) throw std::invalid_argument("Invalid FEN board or side");
+        if (count_bits(state.bitboards[K]) != 1 || count_bits(state.bitboards[k]) != 1) throw std::invalid_argument("FEN must contain one king per side");
+        for (int base : {0, 6}) {
+            int pawns = count_bits(state.bitboards[base]);
+            int promoted = std::max(0, count_bits(state.bitboards[base + N]) - 2)
+                         + std::max(0, count_bits(state.bitboards[base + B]) - 2)
+                         + std::max(0, count_bits(state.bitboards[base + R]) - 2)
+                         + std::max(0, count_bits(state.bitboards[base + Q]) - 1);
+            if (pawns > 8 || promoted > 8 - pawns) throw std::invalid_argument("Impossible FEN material count");
         }
-        fen_index++;
-
-        // update the en passant square
-        if (fen[fen_index] != '-')
-        {
-            int file = fen[fen_index] - 'a';
-            int rank = 8 - (fen[fen_index + 1] - '0');
-
-            state.enpassant = rank * 8 + file;
-        }        
-        else
-            state.enpassant = no_square;
-
-        // update occupancies
-        for (int piece = P; piece <= K; piece++)
-            state.occupancies[white] |= state.bitboards[piece];
-        
-        for (int piece = p; piece <= k; piece++)
-            state.occupancies[black] |= state.bitboards[piece];
-        state.occupancies[both] |= state.occupancies[white];
-        state.occupancies[both] |= state.occupancies[black];
-
-        // TODO: update the halfmove clock
-        // TODO: update the fullmove counter
-
-        // recalculate the zobrist hash
+        if ((state.bitboards[P] | state.bitboards[p]) & 0xff000000000000ffULL) throw std::invalid_argument("Pawn on back rank");
+        state.side = side == "w" ? white : black;
+        if (castling != "-") for (char c : castling) {
+            int right = c == 'K' ? wk : c == 'Q' ? wq : c == 'k' ? bk : c == 'q' ? bq : 0;
+            if (!right || (state.castle & right)) throw std::invalid_argument("Invalid castling rights");
+            state.castle |= right;
+        }
+        if (ep != "-") {
+            state.enpassant = string_to_square(ep);
+            if (state.enpassant == no_square || state.enpassant / 8 != (state.side == white ? 2 : 5)) throw std::invalid_argument("Invalid en passant square");
+        }
+        auto counter = [](const string& token, int minimum) {
+            size_t end = 0; int value = std::stoi(token, &end);
+            if (end != token.size() || value < minimum || value > std::numeric_limits<int>::max() - 1024) throw std::invalid_argument("Invalid FEN counter");
+            return value;
+        };
+        if (input >> half) {
+            if (!(input >> full) || input >> extra) throw std::invalid_argument("Invalid FEN fields");
+            state.halfmove_clock = counter(half, 0);
+            state.fullmove_number = counter(full, 1);
+        }
+        for (int piece = P; piece <= k; ++piece) state.occupancies[piece < 6 ? white : black] |= state.bitboards[piece];
+        state.occupancies[both] = state.occupancies[white] | state.occupancies[black];
+        if (state.enpassant != no_square) {
+            int captured = state.enpassant + (state.side == white ? 8 : -8);
+            if (get_bit(state.occupancies[both], state.enpassant) || !get_bit(state.bitboards[state.side == white ? p : P], captured))
+                throw std::invalid_argument("Invalid en passant pawn");
+        }
+        // The side that just moved cannot have left its own king in check.
+        auto previous = state;
+        previous.side = !state.side;
+        if (move_generator::is_square_attacked(least_significant_bit_index(previous.bitboards[previous.side == white ? K : k]), previous))
+            throw std::invalid_argument("FEN leaves the nonmoving king in check");
         state.zobrist_hash = get_zobrist_hash(state);
         return state;
+    }
+
+    U64 repetition_key(board_state state) {
+        if (state.enpassant == no_square) return state.zobrist_hash;
+        // En passant affects repetition only when a legal capture exists.
+        std::array<unsigned int, max_moves> buffer;
+        for (auto move : move_generator::generate_moves(state, buffer, false))
+            if (board::move_enpassant(move)) return state.zobrist_hash;
+        return state.zobrist_hash ^ zobrist_enpassant[state.enpassant];
     }
 
     U64 get_zobrist_hash(board_state &board)

@@ -17,10 +17,9 @@ using namespace constants;
 namespace move_generator
 {
     bool is_square_attacked(int square, board_state &board);
-    bool in_check_after_en_passant(board_state &board, int source, int enemy_pawn_location);
     void print_attacked(board_state &board);
     void print_move_list(span<unsigned int> moves);
-    int perft(board_state board, int depth);
+    U64 perft(board_state board, int depth);
     void perft_debug(board_state board, int depth);
     void perft_test_all_moves();
 
@@ -31,7 +30,7 @@ namespace move_generator
     };
     king_info _find_check_and_pin_masks(board_state &board);
 
-    span<unsigned int> generate_moves(board_state &board, array<unsigned int, 218> &move_list, bool no_quiet_moves);
+    span<unsigned int> generate_moves(board_state &board, array<unsigned int, max_moves> &move_list, bool no_quiet_moves);
     void _generate_pawn_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index);
     void _generate_king_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index);
     void _generate_knight_moves(board_state &board, king_info &info, bool no_quiet_moves, span<unsigned int> moves, int &move_index);

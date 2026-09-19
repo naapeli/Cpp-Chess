@@ -1,0 +1,68 @@
+name: Test engine and build website
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run --frozen cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --parallel 4
+      - name: Install fixed Stockfish reference
+        run: |
+          mkdir -p tools/bin
+          curl --fail --location --retry 3 https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar -o tools/bin/stockfish.tar
+          tar -xf tools/bin/stockfish.tar -C tools/bin
+      - name: Test and compare the previous version
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          STOCKFISH: tools/bin/stockfish/stockfish-ubuntu-x86-64-avx2
+        run: |
+          baseline_args=()
+          if [[ -n "$BASE_SHA" && "$BASE_SHA" != "0000000000000000000000000000000000000000" ]] && git cat-file -e "$BASE_SHA:tests/test_evaluation.py" 2>/dev/null; then
+            git worktree add --detach "$RUNNER_TEMP/chess-base" "$BASE_SHA"
+            cmake -S "$RUNNER_TEMP/chess-base" -B "$RUNNER_TEMP/chess-base-build" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+            cmake --build "$RUNNER_TEMP/chess-base-build" --parallel 4
+            uv run --frozen python -m pytest tests/test_evaluation.py::test_evaluation tests/test_engine.py::test_engine --engine "$RUNNER_TEMP/chess-base-build/engine" --movetime-ms 1000 --repeats 3 --report reports/base.json
+            baseline_args=(--baseline reports/base.json)
+          else
+            echo "No compatible previous revision; recording the initial benchmark."
+          fi
+          uv run --frozen python -m pytest --engine build/engine --movetime-ms 1000 --repeats 3 --max-mean-regression 20 --max-position-regression 150 --report reports/current.json "${baseline_args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-measurements
+          path: reports/*.json
+  website:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '4.0.22'
+      - run: emcmake cmake -S . -B build-wasm -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build-wasm --parallel 4
+      - run: ctest --test-dir build-wasm --output-on-failure
+      - name: Assemble website with freshly compiled engine
+        run: |
+          mkdir -p site/website
+          cp index.html site/
+          cp -r website/* site/website/
+          cp build-wasm/engine.js build-wasm/engine.wasm site/website/
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run --frozen python -m playwright install --with-deps chromium
+      - name: Check the frontend in Chromium
+        run: |
+          uv run --frozen python -m http.server 8000 --bind 127.0.0.1 --directory site > "$RUNNER_TEMP/chess-http.log" 2>&1 &
+          uv run --frozen python -m pytest tests/test_engine.py::test_website --website-url http://127.0.0.1:8000 --browser-channel chromium
+      - uses: actions/upload-artifact@v4
+        with:
+          name: website
+          path: site/

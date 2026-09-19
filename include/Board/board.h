@@ -17,9 +17,11 @@ namespace board
         bool side;
         U64 occupancies[3];
         U64 zobrist_hash;
-        // TODO: half and full move counters
+        int halfmove_clock = 0;
+        int fullmove_number = 1;
     };
     board_state make_move(board_state board, unsigned int move);
+    board_state make_null_move(board_state board);
     // void take_back(board_state board, unsigned int move);
 
     int find_captured_piece(board_state &board, int square);
@@ -42,6 +44,7 @@ namespace board
 namespace board_utils
 {
     board::board_state parse_fen(string fen);
+    U64 repetition_key(board::board_state board);
     U64 get_zobrist_hash(board::board_state &board);
     void print_board(board::board_state &board);
     void print_move_list(std::span<unsigned int> move_list);

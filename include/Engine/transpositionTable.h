@@ -1,43 +1,34 @@
-#ifndef zobrist_hashing
-#define zobrist_hashing
-
+#pragma once
 #include "utils.h"
 #include <array>
+#include <vector>
 
-using random_numbers::random_64_bit_number;
-using std::array;
-
-namespace zobrist
-{
-    extern array<array<U64, 12>, 64> zobrist_pieces;
-    extern U64 zobrist_side;
-    extern array<U64, 16> zobrist_castle;
-    extern array<U64, 64> zobrist_enpassant;
-    
-    void init_zobrist_keys();
+namespace zobrist {
+extern std::array<std::array<U64, 64>, 12> zobrist_pieces;
+extern U64 zobrist_side;
+extern std::array<U64, 16> zobrist_castle;
+extern std::array<U64, 64> zobrist_enpassant;
+void init_zobrist_keys();
 }
 
-namespace transposition_table
-{
-    enum { exact, lowerbound, upperbound };
-    struct transposition_table_entry
-    {
-        U64 zobrist_hash;
-        unsigned int best_move;
-        int depth;
-        int node_type;
-        int evaluation;
-    };
-    constexpr size_t max_size_mb = 64;
-    constexpr size_t bytes_per_mb = 1024 * 1024;
-    constexpr size_t array_size = (max_size_mb * bytes_per_mb) / sizeof(transposition_table_entry);
-    extern array<transposition_table_entry, array_size> tt_table;
-
-    void add_move_to_table(U64 zobrist_hash, unsigned int move, int depth, int node_type, int evaluation);
-    int get_evaluation_from_table(U64 zobrist_hash, int depth, int alpha, int beta);
-    unsigned int get_best_move_from_table(U64 zobrist_hash, int depth);
-    transposition_table_entry& get_entry_from_table(U64 zobrist_hash);
+namespace transposition_table {
+enum Bound { exact, lowerbound, upperbound };
+struct Entry {
+    U64 key = 0;
+    unsigned int move = 0;
+    int score = 0;
+    int depth = -1;
+    Bound bound = upperbound;
+};
+class Table {
+public:
+    explicit Table(int megabytes);
+    void resize(int megabytes);
+    void clear();
+    Entry probe(U64 key) const;
+    void store(U64 key, unsigned int move, int depth, Bound bound, int score, int ply);
+    static int score_at_ply(int score, int ply);
+private:
+    std::vector<Entry> entries;
+};
 }
-
-
-#endif
